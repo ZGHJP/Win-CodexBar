@@ -39,8 +39,9 @@ use crate::cost_reporting_period::cost_bucket_zone;
 /// fork's first token timestamp so direct-fork chains resolve through parents
 /// with no token snapshot at the descendant's fork time. Version 6 records the
 /// Codex turn id on source rows so Priority trace evidence can be matched.
-/// Rebuild older artifacts.
-pub(crate) const CODEX_CACHE_SCHEMA_VERSION: u32 = 6;
+/// Version 7 rebuilds model pricing corrupted by source-row recovery across
+/// different reporting partitions. Rebuild older artifacts.
+pub(crate) const CODEX_CACHE_SCHEMA_VERSION: u32 = 7;
 
 /// Whether a persisted Codex cache artifact matches the current schema.
 /// A mismatched artifact (e.g. a pre-64-bit cache from an older release) is
