@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { BootstrapState, ProviderUsageSnapshot, UsageSpendSummary } from "../types/bridge";
 import type { LocaleKey } from "../i18n/keys";
 import { costPeriodLabel, costPeriodShortLabel } from "../lib/costPeriod";
@@ -358,11 +359,29 @@ function OverviewSpendSummary({
 
   useEffect(() => {
     let cancelled = false;
-    // No explicit period: the backend resolves the saved History window.
-    void getUsageSpendSummary()
-      .then((value) => { if (!cancelled) setSummary(value); })
-      .catch(() => { if (!cancelled) setSummary(null); });
-    return () => { cancelled = true; };
+    let request = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let unlisten: UnlistenFn | null = null;
+    const load = () => {
+      const current = ++request;
+      // No explicit period: the backend resolves the saved History window.
+      void getUsageSpendSummary()
+        .then((value) => { if (!cancelled && current === request) setSummary(value); })
+        .catch(() => { if (!cancelled && current === request) setSummary(null); });
+    };
+    load();
+    void listen("provider-updated", () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(load, 200);
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      unlisten?.();
+    };
   }, [providerIds.join("|"), period]);
 
   // Overview consumes the same backend spend catalog as Usage & Spend. Do not
