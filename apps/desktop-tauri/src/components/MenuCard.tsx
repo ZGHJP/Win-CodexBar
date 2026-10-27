@@ -188,7 +188,7 @@ export default function MenuCard({
     return () => {
       cancelled = true;
     };
-  }, [provider.providerId, provider.accountEmail, onLayoutChange]);
+  }, [provider.providerId, provider.accountEmail, provider.updatedAt, onLayoutChange]);
 
   const isWayfinder = provider.providerId === "wayfinder";
   const email = !isWayfinder && provider.accountEmail

@@ -152,6 +152,7 @@ describe("MenuCard", () => {
         WayfinderDryRun: "Dry run",
         WayfinderMissingKeys: "Missing keys",
         UsageSpendTokens: "tokens",
+        UsageSpendUnpriced: "Unpriced",
         DeepSeekPricingTitle: "DeepSeek pricing",
         DeepSeekPricingStandard: "Standard / pre-schedule",
         DeepSeekPricingPeak: "Peak hours",
@@ -871,6 +872,92 @@ describe("MenuCard", () => {
     });
 
     expect(bar).toHaveAttribute("title", "2026-05-24: $1.23 · 14K tokens");
+  });
+
+  it("keeps a day visible when tokens are known but its price is incomplete", async () => {
+    const snapshot = provider(null);
+    snapshot.providerId = "codex";
+    snapshot.displayName = "Codex";
+    tauriMocks.getProviderChartData.mockResolvedValue({
+      providerId: "codex",
+      costHistory: [{ date: "2026-10-21", value: null }],
+      creditsHistory: [],
+      usageBreakdown: [],
+      localUsage: {
+        todayCost: null,
+        thirtyDayCost: 79.352137,
+        thirtyDayTokens: 189_920_857,
+        latestTokens: null,
+        topModel: "gpt-6.1-sol",
+        estimateNote: "Estimated from local logs",
+        tokenCostUpdatedAtMs: 1234,
+      },
+      tokensHistory: [{ date: "2026-10-21", tokens: 189_920_857 }],
+      tokensIncomplete: false,
+    });
+
+    const { container } = renderCard(snapshot);
+    const bar = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>(".menu-card__local-chart span");
+      if (!element) throw new Error("local chart bar not rendered yet");
+      return element;
+    });
+    expect(bar.style.opacity).not.toBe("0");
+    expect(bar.title).toContain("2026-10-21");
+    expect(bar.title).toContain("tokens");
+    expect(bar.title).toContain("Unpriced");
+    expect(bar.title).not.toContain("$0");
+  });
+
+  it("refreshes the tray cost chart when the same account publishes new usage after midnight", async () => {
+    const snapshot = provider(null);
+    snapshot.providerId = "codex";
+    snapshot.displayName = "Codex";
+    snapshot.updatedAt = "2026-10-21T15:59:00Z";
+    const chart = {
+      providerId: "codex",
+      costHistory: [{ date: "2026-10-21", value: 1.23 }],
+      creditsHistory: [],
+      usageBreakdown: [],
+      localUsage: {
+        todayCost: 1.23,
+        thirtyDayCost: 1.23,
+        thirtyDayTokens: 14_200,
+        latestTokens: 14_200,
+        topModel: "gpt-6.1-sol",
+        estimateNote: "Estimated from local logs",
+        tokenCostUpdatedAtMs: 1_000,
+      },
+      tokensHistory: [{ date: "2026-10-21", tokens: 14_200 }],
+      tokensIncomplete: false,
+    };
+    tauriMocks.getProviderChartData.mockResolvedValue(chart);
+    const onLayoutChange = vi.fn();
+    const { container, rerender } = renderCard(snapshot, { onLayoutChange });
+    await waitFor(() => {
+      expect(container.querySelector(".menu-card__local-chart span"))
+        .toHaveAttribute("title", "2026-10-21: $1.23 · 14K tokens");
+    });
+
+    tauriMocks.getProviderChartData.mockResolvedValue({
+      ...chart,
+      costHistory: [{ date: "2026-10-22", value: 4.56 }],
+      tokensHistory: [{ date: "2026-10-22", tokens: 28_400 }],
+    });
+    rerender(
+      <LocaleProvider>
+        <MenuCard
+          provider={{ ...snapshot, updatedAt: "2026-10-21T16:01:00Z" }}
+          display={{ hideEmail: false, resetTimeRelative: true }}
+          onLayoutChange={onLayoutChange}
+        />
+      </LocaleProvider>,
+    );
+    await waitFor(() => {
+      expect(container.querySelector(".menu-card__local-chart span"))
+        .toHaveAttribute("title", "2026-10-22: $4.56 · 28K tokens");
+    });
+    expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(2);
   });
 
   it("labels local totals with the selected History window instead of 30 days", async () => {

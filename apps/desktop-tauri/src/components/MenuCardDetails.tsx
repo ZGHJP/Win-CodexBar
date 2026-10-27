@@ -112,9 +112,10 @@ function formatLocalUsagePointTitle(
   point: DailyCostPoint,
   tokenCount: number | undefined,
   tokenLabel: string,
+  unpricedLabel: string,
 ): string {
   if (point.value == null && tokenCount == null) return point.date;
-  const cost = point.value == null ? "—" : formatCurrency(point.value, "USD");
+  const cost = point.value == null ? unpricedLabel : formatCurrency(point.value, "USD");
   const tokens = tokenCount == null ? "—" : `${formatCompactCount(tokenCount)} ${tokenLabel}`;
   return `${point.date}: ${cost} · ${tokens}`;
 }
@@ -190,20 +191,29 @@ function LocalUsageBlock({
 
       {isCodex && visibleHistory.length > 0 && (
         <div className="menu-card__local-chart" aria-label={t("PanelThirtyDayCostHistogram")}>
-          {visibleHistory.map((point, index) => (
-            <span
-              key={`${point.date}-${index}`}
-              style={{
-                height: `${point.value == null || maxCost <= 0 ? 1 : Math.max(4, Math.round((point.value / maxCost) * 64))}px`,
-                opacity: point.value == null ? 0 : undefined,
-              }}
-              title={formatLocalUsagePointTitle(
-                point,
-                tokensByDate.get(point.date),
-                t("UsageSpendTokens"),
-              )}
-            />
-          ))}
+          {visibleHistory.map((point, index) => {
+            const tokens = tokensByDate.get(point.date);
+            const unpricedWithTokens = point.value == null && (tokens ?? 0) > 0;
+            return (
+              <span
+                key={`${point.date}-${index}`}
+                style={{
+                  height: `${point.value == null ? (unpricedWithTokens ? 4 : 1) : maxCost <= 0 ? 1 : Math.max(4, Math.round((point.value / maxCost) * 64))}px`,
+                  opacity: point.value == null ? (unpricedWithTokens ? 0.6 : 0) : undefined,
+                  background: point.value == null ? "transparent" : undefined,
+                  border: unpricedWithTokens
+                    ? "1px dashed currentColor"
+                    : undefined,
+                }}
+                title={formatLocalUsagePointTitle(
+                  point,
+                  tokens,
+                  t("UsageSpendTokens"),
+                  t("UsageSpendUnpriced"),
+                )}
+              />
+            );
+          })}
         </div>
       )}
 
