@@ -39,6 +39,17 @@ API 模型页目前给出的长上下文加价门槛仍为单次输入超过 272
 3. 需要审计每日聚合是否误用请求级长上下文门槛；不能用一天累计输入判断单次请求是否加价。
 4. 多次锁屏、跨午夜及长期运行的完整稳定性尚未证明。
 
+## 上游贡献
+
+2026-10-27 已分别提交以下 PR，目前等待上游审查；它们都基于上游 `main`，互不依赖：
+
+- [#1036：切换历史范围后丢失已知模型定价](https://github.com/nesszer/Win-CodexBar/pull/1036)
+- [#1037：重置预测抖动产生几分钟的虚假历史周期](https://github.com/nesszer/Win-CodexBar/pull/1037)
+- [#1038：托盘顶部汇总不随提供者更新](https://github.com/nesszer/Win-CodexBar/pull/1038)
+- [#1039：每日图表不更新及未定价 token 日不可见](https://github.com/nesszer/Win-CodexBar/pull/1039)
+
+个人辅助层没有混入这些 PR。旧表格的时间与列标题改动仅保留在 stable，因为新版上游已经替换了该界面。
+
 ## 构建与检查
 
 前提：Windows、Git、项目锁定的 pnpm、Rust 与 Windows C++ 构建环境；辅助层使用 Python 3.12 和 `zstandard==0.25.0`。已有 WSL cargo-xwin 环境也可沿用，见 `build-wsl.sh`。
