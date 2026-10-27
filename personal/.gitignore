@@ -1,0 +1,8 @@
+/artifacts/
+/usage-compat/*
+!/usage-compat/compat.py
+!/usage-compat/test_compat.py
+!/usage-compat/Launcher.cs
+!/usage-compat/requirements.txt
+__pycache__/
+*.pyc
