@@ -9,7 +9,10 @@ interface Props {
 }
 
 function shortTimestamp(value: string): string {
-  return value.replace("T", " ").replace(/\.\d+Z$/, "").replace(/Z$/, "").slice(0, 16);
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function formatTokens(value: number | null, complete: boolean, estimatedBoundary: boolean): string {
@@ -46,8 +49,8 @@ export function QuotaWindowHistory({ history, t }: Props) {
         data-history-coverage={history.historyCoverageEstablished ? "complete" : "partial"}
       >
         <div className="quota-window-history__row quota-window-history__row--header" role="row">
-          <span role="columnheader">{t("DetailChartTokens")}</span>
-          <span role="columnheader">{t("DetailChartCost")}</span>
+          <span role="columnheader">{t("UsageSpendColTokens")}</span>
+          <span role="columnheader">{t("UsageSpendColCost")}</span>
         </div>
         {history.windows.map((window) => (
           <div

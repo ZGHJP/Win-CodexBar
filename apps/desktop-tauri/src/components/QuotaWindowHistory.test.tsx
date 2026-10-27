@@ -23,6 +23,35 @@ const history: QuotaWindowHistoryBridge = {
 };
 
 describe("QuotaWindowHistory", () => {
+  it("renders equivalent UTC and offset boundaries in the same local time", () => {
+    const { container } = render(
+      <QuotaWindowHistory
+        history={{
+          ...history,
+          windows: [
+            history.windows[0],
+            {
+              ...history.windows[0],
+              offset: 1,
+              start: "2026-09-14T20:00:00+08:00",
+              end: "2026-09-21T20:00:00+08:00",
+            },
+          ],
+        }}
+        t={(key) => key}
+      />,
+    );
+    const ranges = container.querySelectorAll(".quota-window-history__range");
+    expect(ranges[0].textContent).toBe(ranges[1].textContent);
+  });
+
+  it("does not label quota windows as a 30-day chart", () => {
+    render(<QuotaWindowHistory history={history} t={(key) => key} />);
+    expect(screen.getByRole("columnheader", { name: "UsageSpendColTokens" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "UsageSpendColCost" })).toBeInTheDocument();
+    expect(screen.queryByText("DetailChartTokens")).not.toBeInTheDocument();
+  });
+
   it("marks estimated boundaries instead of presenting exact totals", () => {
     render(<QuotaWindowHistory history={history} t={(key) => key} />);
 
