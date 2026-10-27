@@ -18,3 +18,10 @@
 `personal/stable` 的五组原生修复文件与已部署 R5 源码逐字节一致。辅助层仅归档 `compat.py`、`test_compat.py`、`Launcher.cs`，不归档运行数据。
 
 本次新增构建及检查结果另按实际运行追加，不能把上面的历史验证自动套用到 integration 或新发行包。
+
+2026-10-27 源码归档后的复验：
+
+- `personal/build.ps1 -FrontendOnly` 完成冻结依赖安装、译文检查、类型检查和生产前端构建。
+- `vitest run --config ../../personal/vitest.config.ts`：96 文件、631 测试通过。
+- `python -m unittest discover -s personal/usage-compat -p test_compat.py -v`：9 测试通过（复用已安装的 zstandard 0.25.0）。
+- 发布通过 GitHub Git Trees API 完成；每次写入均核对 API 返回的 tree SHA 与本地提交的 tree SHA 完全相同。发布的是可重建源码，没有在此次整理中替换本机 R5 可执行文件或发布新的安装包。

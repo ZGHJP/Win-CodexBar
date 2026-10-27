@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Personal fork maintenance
+
+- This checkout's maintenance fork is `ZGHJP/Win-CodexBar`; upstream is `nesszer/Win-CodexBar`. For branch roles, rebuilding the installed R5 baseline, billing limitations, upgrades or rollback, read `personal/README.md` and `personal/VALIDATION.md` first.
+- Keep personal compatibility tools on `personal/stable`. Send focused, independently based `fix/*` branches upstream. Preserve original upstream attribution, including PR #779 by zhangkom.
+- The user's billing context is an official ChatGPT/Codex subscription or credits. Label API-dollar totals as estimates; establish the applicable subscription/credits rules before changing them.
+- Publish explicit source files and synthetic fixtures. Keep runtime home directories, credentials, databases, real usage logs and machine-specific deployment records outside Git.
+
 ## Project Overview
 
 - Windows desktop tray app for AI-provider usage and limits (Win-CodexBar port of CodexBar).
@@ -186,5 +193,5 @@ Then follow post-install instructions (permissions / accessibility as prompted).
 - Keep stable package identity and installer behavior unchanged unless there is a real packaging reason: `PackageIdentifier`, `InstallerType`, `Scope`, `ProductCode`, `Publisher`, package URLs, and silent install behavior.
 - Before opening a Winget PR, verify the release installer URL resolves and recompute the SHA-256 from the downloaded asset. On Windows, run `winget validate` when available.
 - The first Winget package submission was approved in `microsoft/winget-pkgs#366653`; the v0.23.5 update was approved in `microsoft/winget-pkgs#366794`. Future updates should be faster, but still expect Microsoft validation/review.
-- Agents must route GitHub mutations through `scripts/gh-safe.sh` instead of calling mutating `gh` subcommands directly. This is the sole supported mutation wrapper. It owns repo binding, performs read-back verification, blocks repo overrides, and fails closed on target mismatch.
+- Route mutating `gh` commands through `scripts/gh-safe.sh`. When using the user's connected GitHub plugin, perform the same explicit repository read-back check before writing, use expected-SHA guards for branch updates, and read back created branches and PRs. The plugin is the supported alternative when GitHub CLI is unavailable.
 - For object mutations (PR/issue/release), bind both the exact `owner/repo` and exact object number/tag. Use repo-only verification only for creates where the target object does not exist yet.
