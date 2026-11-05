@@ -1,5 +1,35 @@
 # 验证记录
 
+## Personal 0.70.0-jp.4（2026-11-06）
+
+构建源码：`ee94dec04dc2ad4e70cebe18a5ca0cddb1068cc7`；
+[Windows 云端构建 #8](https://github.com/ZGHJP/Win-CodexBar/actions/runs/42075088934)。
+R6/R7 原提交未推送到此 fork，本次按维护记录重新实现，见
+[变更说明](R6-R7-REIMPLEMENTATION.md)。
+
+- 最终前端：97 文件、661 测试通过；TypeScript、984 个译文键及生产资源构建通过。
+- Windows core：3,696 通过、1 项既有忽略；CLI 启动日志测试 1 项通过。
+- Windows desktop：612 通过。Rust formatter 运行后源码无差异。
+- 两份 manifest 的 release/all-target clippy 通过，使用既有
+  `-D warnings -A clippy::double_must_use`；不是无豁免检查。
+- 首轮完整 core 有 4 项失败。新增稀疏历史测试的预期错误地要求制造两天短尾；
+  修正为保留九天不规则旧区间，并继续断言从最近边界倒推及不产生短尾。
+  另外三项既有 Windows fixture 使用短临时路径，和规范化后的长路径比较失败；
+  云端改用一致的 runner 临时目录后，完整测试重跑通过，没有跳过失败用例。
+- 正式 Tauri 桌面及 CLI 构建成功；通过 Tauri CLI 嵌入生产资源。
+- 构建包与 GitHub artifact SHA256 一致；包内每个文件校验通过；
+  按用户安装后的二进制与包内哈希一致。
+- 新构建的真实 Windows 窗口已展开并显示四段周期、更新时间、tokens 和估算费用。
+  退出后以不同 PID 重启，四段起止不变，聚合用量继续更新。
+  查询仍 pending 时恢复旧行、乱序请求、账户/周期隔离及坏存储的精确行为由组件测试覆盖；
+  没有测量原生窗口第一帧耗时。验证后恢复普通启动。
+
+Artifact ZIP SHA256：`e19fa4083958f227a17e7b3521933e5c9c5fad65869182ad8ab79061ff2336ae`。
+桌面 EXE SHA256：`b53c583ee66b7d085bc087cbfd2e5127101078675947d5bff5193dd4df8657d1`。
+个人构建号为 `personal-0.70.0-jp.4-gh-8`；原生文件版本保留上游 `0.70.0`。
+价格、Fast、订阅/credits 换算及长期锁屏/跨午夜验证不在本次修复范围内。
+真实账户、截图、用量和本机部署清单不提交到源码仓库。
+
 ## 当前安装版的历史验证
 
 对应构建：`pr779-trayfix-20261026-r5`；辅助层：20261026-r2，投影 schema 4。
