@@ -976,6 +976,19 @@ describe("MenuCard", () => {
     expect(screen.queryByText("~1,234")).not.toBeInTheDocument();
   });
 
+  it.each(["period", "unavailable"] as const)("does not reuse an unvalidated quota table when %s changes", async (change) => {
+    const { snapshot, chart } = quotaFixture();
+    tauriMocks.getProviderChartData.mockResolvedValue(chart);
+    const view = renderCard(snapshot);
+    await screen.findByText("~1,234");
+    tauriMocks.getProviderChartData.mockImplementation(() => new Promise(() => {}));
+    const next = change === "unavailable" ? { ...snapshot, error: "Unavailable" } : {
+      ...snapshot, secondary: { ...snapshot.secondary!, resetsAt: new Date(Date.parse(snapshot.secondary!.resetsAt!) + 7 * 24 * 60 * 60_000).toISOString() },
+    };
+    view.rerender(<LocaleProvider><MenuCard provider={next} display={{ hideEmail: false, resetTimeRelative: true }} /></LocaleProvider>);
+    expect(screen.queryByText("~1,234")).not.toBeInTheDocument();
+  });
+
   it("refreshes the tray cost chart when the same account publishes new usage after midnight", async () => {
     const snapshot = provider(null);
     snapshot.providerId = "codex";

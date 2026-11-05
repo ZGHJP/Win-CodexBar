@@ -169,7 +169,7 @@ export default function MenuCard({
   const quotaHistory = useSavedQuota ? savedQuota.history : freshQuota;
   const quotaUpdatedAt = useSavedQuota ? savedQuota.savedAt : freshQuota ? currentChart?.savedAt : null;
   const chartData: ProviderChartData | null = currentChart
-    ? { ...currentChart.data, ...(quotaScope ? { quotaWindowHistory: quotaHistory } : {}) }
+    ? { ...currentChart.data, ...(provider.providerId === "codex" ? { quotaWindowHistory: quotaHistory } : {}) }
     : quotaHistory ? { providerId: provider.providerId, costHistory: [], tokensHistory: [],
         creditsHistory: [], usageBreakdown: [], localUsage: null, tokensIncomplete: true,
         quotaWindowHistory: quotaHistory } : null;

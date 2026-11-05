@@ -60,7 +60,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm --dir apps/desktop-tauri install --frozen-lockfile
           if ($LASTEXITCODE) { throw 'Frontend dependency install failed.' }
-          pnpm --dir apps/desktop-tauri exec vitest run --config ../../personal/vitest.config.ts
+          pnpm --dir apps/desktop-tauri exec vitest run --config ../../personal/vitest.config.ts --maxWorkers=4
           if ($LASTEXITCODE) { throw 'Frontend regressions failed.' }
           python -m pip install --requirement personal/usage-compat/requirements.txt
           if ($LASTEXITCODE) { throw 'Compatibility dependency install failed.' }
