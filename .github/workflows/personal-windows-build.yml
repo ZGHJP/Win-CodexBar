@@ -1,0 +1,97 @@
+name: Personal Windows build
+
+on:
+  push:
+    branches: [codex/cloud-personal-build-20261105]
+    paths: [.github/workflows/personal-windows-build.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.repository == 'ZGHJP/Win-CodexBar'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
+      RUSTFLAGS: '-C target-feature=+crt-static'
+      BUILD_NUMBER: personal-0.70.0-jp.1-gh-${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop-tauri/package.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build locked frontend and run regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir apps/desktop-tauri install --frozen-lockfile
+          if ($LASTEXITCODE) { throw 'Frontend dependency install failed.' }
+          pnpm --dir apps/desktop-tauri exec vitest run --config ../../personal/vitest.config.ts
+          if ($LASTEXITCODE) { throw 'Frontend regressions failed.' }
+          python -m pip install --requirement personal/usage-compat/requirements.txt
+          if ($LASTEXITCODE) { throw 'Compatibility dependency install failed.' }
+          python -m unittest discover -s personal/usage-compat -p test_compat.py -v
+          if ($LASTEXITCODE) { throw 'Compatibility regressions failed.' }
+      - name: Build native desktop and CLI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./scripts/worktree-env.ps1 -TargetDirectory "$env:RUNNER_TEMP\codexbar-cargo-target"
+          pnpm --dir apps/desktop-tauri run tauri:build
+          if ($LASTEXITCODE) { throw 'Desktop build failed.' }
+          cargo build --locked -p codexbar --bin codexbar --release
+          if ($LASTEXITCODE) { throw 'CLI build failed.' }
+          git diff --exit-code -- Cargo.lock apps/desktop-tauri/pnpm-lock.yaml
+          if ($LASTEXITCODE) { throw 'Build changed a lockfile.' }
+          $package = Join-Path $env:GITHUB_WORKSPACE 'personal-package'
+          New-Item -ItemType Directory -Path "$package\app", "$package\usage-compat\python-libs" -Force | Out-Null
+          Copy-Item -LiteralPath "$env:CARGO_TARGET_DIR\release\codexbar-desktop-tauri.exe" -Destination "$package\app\codexbar-desktop.exe"
+          Copy-Item -LiteralPath "$env:CARGO_TARGET_DIR\release\codexbar.exe" -Destination "$package\app\codexbar-cli.exe"
+          Copy-Item -LiteralPath 'rust/icons/icon.ico' -Destination "$package\app\icon.ico"
+          Copy-Item -LiteralPath 'personal/usage-compat/compat.py' -Destination "$package\usage-compat\compat.py"
+          python -m pip install --only-binary=:all: --no-compile --target "$package\usage-compat\python-libs" --requirement personal/usage-compat/requirements.txt
+          if ($LASTEXITCODE) { throw 'Compatibility packaging failed.' }
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /reference:System.Windows.Forms.dll "/out:$package\app\codexbar.exe" personal/usage-compat/Launcher.cs
+          if ($LASTEXITCODE) { throw 'Launcher build failed.' }
+          & "$package\app\codexbar-cli.exe" --version
+          if ($LASTEXITCODE) { throw 'CLI smoke check failed.' }
+          @{
+            repository = $env:GITHUB_REPOSITORY
+            sourceBaseCommit = '45c2a463724ab532ce78fad64e595390a3fb935d'
+            workflowCommit = $env:GITHUB_SHA
+            personalVersion = '0.70.0-jp.1'
+            buildNumber = $env:BUILD_NUMBER
+            runUrl = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            rust = (rustc --version | Out-String).Trim()
+            node = (node --version | Out-String).Trim()
+            python = '3.12'
+            signing = 'Unsigned personal build; not an upstream release'
+          } | ConvertTo-Json | Set-Content -LiteralPath "$package\build-manifest.json" -Encoding utf8
+          Get-ChildItem -LiteralPath $package -Recurse -File | Sort-Object FullName | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath($package, $_.FullName).Replace('\', '/')
+            '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative
+          } | Set-Content -LiteralPath "$package\SHA256SUMS.txt" -Encoding utf8
+      - name: Upload ready-to-install personal build
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexBar-0.70.0-jp.1-windows-x64
+          path: personal-package/
+          if-no-files-found: error
+          retention-days: 30
+
