@@ -96,6 +96,12 @@ jobs:
           Copy-Item -LiteralPath "$env:CARGO_TARGET_DIR\release\codexbar.exe" -Destination "$package\app\codexbar-cli.exe"
           Copy-Item -LiteralPath 'rust/icons/icon.ico' -Destination "$package\app\icon.ico"
           Copy-Item -LiteralPath 'personal/usage-compat/compat.py' -Destination "$package\usage-compat\compat.py"
+          foreach ($file in @('LICENSE', 'NOTICE')) {
+            Copy-Item -LiteralPath $file -Destination $package
+          }
+          foreach ($file in @('Install.ps1', 'Install.cmd', 'R6-R7-REIMPLEMENTATION.md')) {
+            Copy-Item -LiteralPath "personal/$file" -Destination $package
+          }
           python -m pip install --only-binary=:all: --no-compile --target "$package\usage-compat\python-libs" --requirement personal/usage-compat/requirements.txt
           if ($LASTEXITCODE) { throw 'Compatibility packaging failed.' }
           $launcherSource = Join-Path $env:GITHUB_WORKSPACE 'personal\usage-compat\Launcher.cs'

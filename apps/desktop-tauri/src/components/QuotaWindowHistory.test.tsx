@@ -23,6 +23,17 @@ const history: QuotaWindowHistoryBridge = {
 };
 
 describe("QuotaWindowHistory", () => {
+  it.each(["loading", "error", "empty"] as const)("keeps headers without inventing totals when %s", (state) => {
+    render(<QuotaWindowHistory history={null} state={state} t={(key) => key} />);
+    expect(screen.getByRole("columnheader", { name: "UsageSpendColTokens" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "UsageSpendColCost" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      state === "loading" ? "QuotaHistoryRefreshing" : state === "error" ? "QuotaHistoryUnavailable" : "QuotaHistoryEmpty",
+    );
+    expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(1);
+  });
+
   it("renders equivalent UTC and offset boundaries in the same local time", () => {
     const { container } = render(
       <QuotaWindowHistory
