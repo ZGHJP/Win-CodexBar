@@ -3,7 +3,7 @@ name: Personal Windows build
 on:
   push:
     branches: [codex/cloud-personal-build-20261105]
-    paths: [.github/workflows/personal-windows-build.yml]
+    paths: [.github/workflows/personal-windows-build.yml, 'rust/**', 'apps/**', 'personal/**']
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
       CARGO_TERM_COLOR: always
       RUSTFLAGS: '-C target-feature=+crt-static'
       CARGO_TARGET_DIR: ${{ github.workspace }}-cargo-target
-      BUILD_NUMBER: personal-0.70.0-jp.1-gh-${{ github.run_number }}
+      BUILD_NUMBER: personal-0.70.0-jp.4-gh-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,12 +33,27 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify Rust formatting
+        shell: pwsh
+        run: |
+          cargo fmt --all
+          git diff --output=rust-format.patch -- '*.rs'
+          git diff --exit-code -- '*.rs'
+          if ($LASTEXITCODE) { throw 'Apply rust-format.patch to the source before building.' }
+      - name: Upload formatter patch
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-format-patch
+          path: rust-format.patch
+          if-no-files-found: ignore
       - name: Build locked frontend and run regressions
         shell: pwsh
         run: |
@@ -51,6 +66,19 @@ jobs:
           if ($LASTEXITCODE) { throw 'Compatibility dependency install failed.' }
           python -m unittest discover -s personal/usage-compat -p test_compat.py -v
           if ($LASTEXITCODE) { throw 'Compatibility regressions failed.' }
+      - name: Test and lint both Rust manifests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./scripts/worktree-env.ps1 -TargetDirectory $env:CARGO_TARGET_DIR
+          cargo test --locked --release --manifest-path rust/Cargo.toml
+          if ($LASTEXITCODE) { throw 'Core Rust tests failed.' }
+          cargo test --locked --release --manifest-path apps/desktop-tauri/src-tauri/Cargo.toml
+          if ($LASTEXITCODE) { throw 'Desktop Rust tests failed.' }
+          cargo clippy --locked --release --manifest-path rust/Cargo.toml --all-targets -- -D warnings -A clippy::double_must_use
+          if ($LASTEXITCODE) { throw 'Core clippy failed.' }
+          cargo clippy --locked --release --manifest-path apps/desktop-tauri/src-tauri/Cargo.toml --all-targets -- -D warnings -A clippy::double_must_use
+          if ($LASTEXITCODE) { throw 'Desktop clippy failed.' }
       - name: Build native desktop and CLI
         shell: pwsh
         run: |
@@ -79,7 +107,7 @@ jobs:
             repository = $env:GITHUB_REPOSITORY
             sourceBaseCommit = '45c2a463724ab532ce78fad64e595390a3fb935d'
             workflowCommit = $env:GITHUB_SHA
-            personalVersion = '0.70.0-jp.1'
+            personalVersion = '0.70.0-jp.4'
             buildNumber = $env:BUILD_NUMBER
             runUrl = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             rust = (rustc --version | Out-String).Trim()
@@ -95,7 +123,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CodexBar-0.70.0-jp.1-windows-x64
+          name: CodexBar-0.70.0-jp.4-windows-x64
           path: personal-package/
           if-no-files-found: error
           retention-days: 30

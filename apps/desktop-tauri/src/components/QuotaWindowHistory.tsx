@@ -6,6 +6,8 @@ type T = ReturnType<typeof useLocale>["t"];
 interface Props {
   history: QuotaWindowHistoryBridge | null | undefined;
   t: T;
+  state?: "loading" | "error" | "empty";
+  updatedAt?: number | null;
 }
 
 function shortTimestamp(value: string): string {
@@ -32,27 +34,34 @@ function formatCost(value: number | null, complete: boolean, estimatedBoundary: 
  * Tilde-prefixed values are known subtotals whose source or boundary is not
  * complete; the component never turns them into live quota state.
  */
-export function QuotaWindowHistory({ history, t }: Props) {
-  if (!history || history.windows.length === 0) return null;
+export function QuotaWindowHistory({ history, t, state, updatedAt }: Props) {
+  const windows = history?.windows ?? [];
+  if (!windows.length && state === undefined) return null;
 
   return (
     <section
       className="menu-card__group quota-window-history"
       aria-label={t("PanelUsageDetails")}
-      data-history-coverage={history.historyCoverageEstablished ? "complete" : "partial"}
-      data-provider-id={history.providerId}
+      data-history-coverage={history?.historyCoverageEstablished ? "complete" : "partial"}
+      data-provider-id={history?.providerId}
     >
       <div className="menu-card__group-title">{t("PanelUsageDetails")}</div>
+      {updatedAt != null && <div className="menu-card__cost-line menu-card__cost-line--muted">
+        {t("LastUpdated")}: {shortTimestamp(new Date(updatedAt).toISOString())}
+      </div>}
+      {(state === "loading" || state === "error" || !windows.length) && <div role="status">
+        {t(state === "loading" ? "QuotaHistoryRefreshing" : state === "error" ? "QuotaHistoryUnavailable" : "QuotaHistoryEmpty")}
+      </div>}
       <div
         className="quota-window-history__rows"
         role="table"
-        data-history-coverage={history.historyCoverageEstablished ? "complete" : "partial"}
+        data-history-coverage={history?.historyCoverageEstablished ? "complete" : "partial"}
       >
         <div className="quota-window-history__row quota-window-history__row--header" role="row">
           <span role="columnheader">{t("UsageSpendColTokens")}</span>
           <span role="columnheader">{t("UsageSpendColCost")}</span>
         </div>
-        {history.windows.map((window) => (
+        {windows.map((window) => (
           <div
             className="quota-window-history__row"
             key={`${window.start}-${window.end}-${window.offset}`}

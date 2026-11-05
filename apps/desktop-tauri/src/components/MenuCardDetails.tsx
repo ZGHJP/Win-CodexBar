@@ -37,6 +37,7 @@ import { providerCostPeriodTitle } from "../lib/providerLabels";
 import { resetDescriptionFallback, windowDetailText } from "../lib/usageWindows";
 import { isDetailSectionVisible } from "../lib/usageItemVisibility";
 import PaceDetailsChart from "./PaceDetailsChart";
+import { quotaHistoryScope } from "../lib/quotaHistoryCache";
 
 /** Format a reserve description from raw pace data at render time. */
 function formatReserveDescription(
@@ -529,6 +530,9 @@ export interface MenuCardDetailsProps {
   chartData: ProviderChartData | null;
   presence: MenuCardPresence;
   onLayoutChange?: () => void;
+  quotaHistoryLoading?: boolean;
+  quotaHistoryError?: boolean;
+  quotaHistoryUpdatedAt?: number | null;
 }
 
 /**
@@ -552,7 +556,8 @@ export function describeCard(
   const hasUsageBreakdown =
     chartData !== null && chartData.usageBreakdown.length > 0;
   const hasQuotaWindowHistory =
-    chartData !== null && (chartData.quotaWindowHistory?.windows.length ?? 0) > 0;
+    (chartData !== null && (chartData.quotaWindowHistory?.windows.length ?? 0) > 0) ||
+    quotaHistoryScope(provider) !== null;
   const hasBurndown = provider.quotaBurndown != null;
   const hasCharts =
     hasCostHistory || hasCreditsHistory || hasUsageBreakdown || hasQuotaWindowHistory;
@@ -618,6 +623,9 @@ export default function MenuCardDetails({
   chartData,
   presence,
   onLayoutChange,
+  quotaHistoryLoading = false,
+  quotaHistoryError = false,
+  quotaHistoryUpdatedAt = null,
 }: MenuCardDetailsProps) {
   const { t } = useLocale();
   const paceEnabled =
@@ -912,7 +920,9 @@ export default function MenuCardDetails({
                   />
                 )}
                 {hasQuotaWindowHistory && (
-                  <QuotaWindowHistory history={chartData!.quotaWindowHistory} t={t} />
+                  <QuotaWindowHistory history={chartData?.quotaWindowHistory} t={t}
+                    state={quotaHistoryError ? "error" : quotaHistoryLoading ? "loading" : "empty"}
+                    updatedAt={quotaHistoryUpdatedAt} />
                 )}
                 {hasBurndown && provider.quotaBurndown && (
                   <QuotaBurndownChart burndown={provider.quotaBurndown} t={t} />

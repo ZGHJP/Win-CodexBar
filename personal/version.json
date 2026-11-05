@@ -1,7 +1,7 @@
 {
-  "version": "0.70.0-jp.1",
+  "version": "0.70.0-jp.4",
   "baseCommit": "f0b45ed422513eaf3e58ef0e321e1b02424547be",
-  "installedReferenceBuild": "pr779-trayfix-20261026-r5",
+  "installedReferenceBuild": "r6-r7-reimplementation-20261106",
   "projectionVersion": 4,
   "pricingDisplay": "API equivalent estimate; not a subscription or credits bill",
   "fastPricingFullySupported": false

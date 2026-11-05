@@ -19,6 +19,8 @@ import { getDeepSeekPricingStatus } from "../lib/tauri";
 import type { DeepSeekPricingStatus } from "../types/bridge";
 import { isUsageItemVisible } from "../lib/usageItemVisibility";
 import { useMonthlyLimitBlockNow } from "../hooks/useMonthlyLimitBlockNow";
+import { chartAccountKey, nextChartRequestAt, quotaHistoryScope, QUOTA_HISTORY_EVENT,
+  readQuotaHistory, saveQuotaHistory, validQuotaHistory } from "../lib/quotaHistoryCache";
 
 /** Small copy-to-clipboard button matching macOS CopyIconButton (doc.on.doc → checkmark). */
 function CopyIconButton({ text }: { text: string }) {
@@ -153,7 +155,24 @@ export default function MenuCard({
     costSummaryDisplayStyle,
   } = display;
   const { t, language } = useLocale();
-  const [chartData, setChartData] = useState<ProviderChartData | null>(null);
+  const accountKey = chartAccountKey(provider);
+  const quotaScope = quotaHistoryScope(provider);
+  const [chartResult, setChartResult] = useState<{
+    key: string; data: ProviderChartData; requestAt: number; savedAt: number;
+  } | null>(null);
+  const [chartStatus, setChartStatus] = useState<{ key: string; loading: boolean; error: boolean } | null>(null);
+  const [, invalidateQuotaCache] = useState(0);
+  const currentChart = chartResult?.key === accountKey ? chartResult : null;
+  const savedQuota = readQuotaHistory(quotaScope);
+  const freshQuota = quotaScope ? validQuotaHistory(quotaScope, currentChart?.data.quotaWindowHistory) : null;
+  const useSavedQuota = savedQuota && (!freshQuota || savedQuota.requestAt > (currentChart?.requestAt ?? 0));
+  const quotaHistory = useSavedQuota ? savedQuota.history : freshQuota;
+  const quotaUpdatedAt = useSavedQuota ? savedQuota.savedAt : freshQuota ? currentChart?.savedAt : null;
+  const chartData: ProviderChartData | null = currentChart
+    ? { ...currentChart.data, ...(quotaScope ? { quotaWindowHistory: quotaHistory } : {}) }
+    : quotaHistory ? { providerId: provider.providerId, costHistory: [], tokensHistory: [],
+        creditsHistory: [], usageBreakdown: [], localUsage: null, tokensIncomplete: true,
+        quotaWindowHistory: quotaHistory } : null;
   const [pricingStatus, setPricingStatus] = useState<DeepSeekPricingStatus | null>(null);
 
   useEffect(() => {
@@ -166,29 +185,48 @@ export default function MenuCard({
   }, [provider.providerId]);
 
   useEffect(() => {
+    const onSaved = (event: Event) => {
+      if (!(event instanceof CustomEvent) || event.detail === accountKey) invalidateQuotaCache((value) => value + 1);
+    };
+    window.addEventListener(QUOTA_HISTORY_EVENT, onSaved);
+    window.addEventListener("storage", onSaved);
+    return () => {
+      window.removeEventListener(QUOTA_HISTORY_EVENT, onSaved);
+      window.removeEventListener("storage", onSaved);
+    };
+  }, [accountKey]);
+
+  useEffect(() => {
     if (!providerSupportsChartData(provider.providerId)) {
-      setChartData(null);
+      setChartResult(null);
       return;
     }
     let cancelled = false;
-    setChartData(null);
+    const requestAt = nextChartRequestAt();
+    setChartStatus({ key: accountKey, loading: true, error: false });
     getProviderChartData(
       provider.providerId,
       provider.accountEmail ?? undefined,
     )
       .then((data) => {
+        if (data.providerId !== provider.providerId) throw new Error("Chart provider mismatch");
+        // A closed card's result can still restore a newly opened card. Only
+        // the small validated history snapshot crosses component lifetimes.
+        saveQuotaHistory(quotaScope, data.quotaWindowHistory, requestAt);
         if (!cancelled) {
-          setChartData(data);
+          setChartResult({ key: accountKey, data, requestAt, savedAt: Date.now() });
+          setChartStatus({ key: accountKey, loading: false, error: false });
           requestAnimationFrame(() => onLayoutChange?.());
         }
       })
       .catch(() => {
-        /* chart data is best-effort */
+        if (!cancelled) setChartStatus({ key: accountKey, loading: false, error: true });
       });
     return () => {
       cancelled = true;
     };
-  }, [provider.providerId, provider.accountEmail, provider.updatedAt, onLayoutChange]);
+  }, [provider.providerId, provider.accountEmail, provider.updatedAt, accountKey,
+      quotaScope?.resetAt, quotaScope?.windowMinutes, onLayoutChange]);
 
   const isWayfinder = provider.providerId === "wayfinder";
   const email = !isWayfinder && provider.accountEmail
@@ -341,6 +379,9 @@ export default function MenuCard({
           }}
           metrics={visibleMetrics}
           chartData={chartData}
+          quotaHistoryLoading={chartStatus?.key === accountKey ? chartStatus.loading : true}
+          quotaHistoryError={chartStatus?.key === accountKey && chartStatus.error}
+          quotaHistoryUpdatedAt={quotaUpdatedAt ?? null}
           presence={presence}
           onLayoutChange={onLayoutChange}
         />

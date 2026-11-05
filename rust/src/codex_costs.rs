@@ -8,7 +8,9 @@ mod quota_windows;
 mod summary_contract;
 
 pub(crate) use host_costs::{CodexHostCostsArgs, HostOutputFormat, run_codex_host_costs};
-pub use quota_windows::{CodexQuotaWindow, codex_quota_windows_from_cache};
+pub use quota_windows::{
+    CodexQuotaResetObservation, CodexQuotaWindow, codex_quota_windows_from_cache,
+};
 pub(crate) use summary_contract::{
     CodexCostSummary, CodexHostCostReport, CodexHostCostWindow, CodexHostOutcome,
     MAX_REMOTE_CODEX_COST_BYTES, REMOTE_CODEX_COST_INVALID, REMOTE_CODEX_COST_UNAVAILABLE,

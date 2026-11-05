@@ -166,7 +166,7 @@ fn load_and_persist_reset_observations(
 fn load_and_persist_codex_reset_observations(
     live_window: &RateWindow,
     now: DateTime<Utc>,
-) -> Vec<DateTime<Utc>> {
+) -> Vec<codex_reset_observations::CodexResetObservation> {
     let Some(reset_at) = live_window.resets_at else {
         return Vec::new();
     };
@@ -181,16 +181,9 @@ fn load_and_persist_codex_reset_observations(
         reset_at,
         now,
     ) {
-        Ok(result) => result
-            .observations
-            .iter()
-            .map(|observation| observation.resets_at)
-            .collect(),
+        Ok(result) => result.observations,
         Err(_) => codex_reset_observations::load_reset_observations(&config_root, scope)
-            .unwrap_or_default()
-            .iter()
-            .map(|observation| observation.resets_at)
-            .collect(),
+            .unwrap_or_default(),
     }
 }
 

@@ -201,7 +201,10 @@ fn moving_future_reset_forecasts_do_not_create_two_minute_history_windows() {
     )]);
     cache.scan_since_key = Some("2026-09-23".to_string());
     cache.scan_until_key = Some("2026-10-23".to_string());
-    let observations = [reset_at - Duration::minutes(2), reset_at];
+    let observations: Vec<_> = [reset_at - Duration::minutes(2), reset_at]
+        .into_iter()
+        .map(|resets_at| CodexQuotaResetObservation { captured_at: now, resets_at })
+        .collect();
 
     let windows = codex_quota_windows_from_cache(
         &cache,
@@ -289,4 +292,87 @@ fn fills_multiple_missing_weeks_between_past_observations() {
             .windows(2)
             .all(|pair| pair[1] - pair[0] == Duration::days(7))
     );
+}
+
+fn observation(captured: &str, reset: &str) -> CodexQuotaResetObservation {
+    CodexQuotaResetObservation { captured_at: utc(captured), resets_at: utc(reset) }
+}
+
+#[test]
+fn superseded_forecast_does_not_revive_after_its_deadline_passes() {
+    let end = utc("2026-11-05T15:25:42Z");
+    let observations = [
+        observation("2026-10-26T08:00:00Z", "2026-11-01T07:10:13Z"),
+        observation("2026-10-29T08:00:00Z", "2026-11-04T06:35:00Z"),
+    ];
+    let cache = cache_with_source_rows(Vec::new());
+    let windows = codex_quota_windows_from_cache(
+        &cache, Some(&weekly_window(end)), &observations,
+        utc("2026-11-02T08:00:00Z"), 4,
+    );
+    assert_eq!(windows[0].start, end - Duration::days(7));
+    assert!(!windows.iter().any(|row| row.start == observations[0].resets_at));
+    assert!(windows.iter().any(|row| row.start == observations[1].resets_at - Duration::days(7)));
+    assert!(windows.iter().all(|row| row.boundaries_are_estimated));
+}
+
+#[test]
+fn rolling_idle_forecasts_stay_unconfirmed_even_after_expiry() {
+    let captured = utc("2026-10-01T08:00:00Z");
+    let observations: Vec<_> = (0..20).map(|minute| {
+        let captured_at = captured + Duration::minutes(minute);
+        CodexQuotaResetObservation { captured_at, resets_at: captured_at + Duration::days(7) }
+    }).collect();
+    let (boundaries, confirmed) = observed_boundaries(
+        &observations, Duration::days(7), captured + Duration::days(10),
+    );
+    assert!(boundaries.is_empty());
+    assert!(confirmed.is_empty());
+}
+
+#[test]
+fn stable_forecast_preserves_an_early_start_as_an_estimate() {
+    let end = utc("2026-11-05T15:25:42Z");
+    let earlier = observation("2026-10-28T08:00:00Z", "2026-11-04T06:35:00Z");
+    let inferred_start = earlier.resets_at - Duration::days(7);
+    let (starts, confirmed) = observed_boundaries(&[earlier], Duration::days(7), end - Duration::days(1));
+    assert_eq!(starts, vec![inferred_start]);
+    assert!(confirmed.is_empty());
+    let boundaries = quota_boundaries(&starts, end, Duration::days(7), 4, end - Duration::days(1));
+    assert!(boundaries.contains(&inferred_start));
+}
+
+#[test]
+fn current_live_window_cannot_be_split_by_old_observations() {
+    let end = utc("2026-11-05T15:25:42Z");
+    let start = end - Duration::days(7);
+    let boundaries = quota_boundaries(&[start + Duration::days(2)], end, Duration::days(7), 4, end - Duration::days(1));
+    assert_eq!(boundaries[boundaries.len() - 2], start);
+    assert!(!boundaries.contains(&(start + Duration::days(2))));
+}
+
+#[test]
+fn jitter_chain_is_merged_before_the_current_start_cutoff() {
+    let end = utc("2026-11-05T15:25:42Z");
+    let start = end - Duration::days(7);
+    let observations = [start - Duration::minutes(4), start - Duration::minutes(2), start, start + Duration::minutes(2)];
+    let boundaries = quota_boundaries(&observations, end, Duration::days(7), 4, end - Duration::days(1));
+    assert!(boundaries.windows(2).all(|pair| pair[1] - pair[0] == Duration::days(7)));
+}
+
+#[test]
+fn sparse_gaps_are_backfilled_from_the_more_recent_boundary() {
+    let end = utc("2026-11-05T15:25:42Z");
+    let old = end - Duration::days(30);
+    let boundaries = quota_boundaries(&[old], end, Duration::days(7), 4, end - Duration::days(1));
+    assert!(boundaries.contains(&(end - Duration::days(28))));
+    assert!(!boundaries.contains(&(old + Duration::days(7))));
+    assert!(boundaries.contains(&old));
+}
+
+#[test]
+fn observations_captured_in_the_future_do_not_influence_history() {
+    let now = utc("2026-11-02T08:00:00Z");
+    let observations = [observation("2026-11-03T08:00:00Z", "2026-11-09T08:00:00Z")];
+    assert_eq!(observed_boundaries(&observations, Duration::days(7), now), (vec![], vec![]));
 }

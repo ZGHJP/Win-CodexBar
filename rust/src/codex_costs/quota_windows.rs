@@ -21,6 +21,14 @@ const MIN_WEEK_MINUTES: u32 = 6 * 24 * 60;
 const MAX_WEEK_MINUTES: u32 = 8 * 24 * 60;
 const MAX_WINDOW_COUNT: usize = 8;
 
+/// A forecast together with the time it was actually observed. A forecast
+/// does not become a historical reset simply because the clock passes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CodexQuotaResetObservation {
+    pub captured_at: DateTime<Utc>,
+    pub resets_at: DateTime<Utc>,
+}
+
 /// One historical Codex quota window, newest first.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,7 +135,7 @@ impl Totals {
 pub fn codex_quota_windows_from_cache(
     cache: &CostUsageCache,
     weekly_window: Option<&RateWindow>,
-    observed_next_resets: &[DateTime<Utc>],
+    observations: &[CodexQuotaResetObservation],
     now: DateTime<Utc>,
     week_count: usize,
 ) -> Vec<CodexQuotaWindow> {
@@ -140,7 +148,8 @@ pub fn codex_quota_windows_from_cache(
     let duration = quota_duration(weekly_window.window_minutes);
     let current_end = current_window_end(reset_at, duration, now);
     let count = week_count.clamp(1, MAX_WINDOW_COUNT);
-    let boundaries = quota_boundaries(observed_next_resets, current_end, duration, count, now);
+    let (observed_starts, confirmed_resets) = observed_boundaries(observations, duration, now);
+    let boundaries = quota_boundaries(&observed_starts, current_end, duration, count, now);
     let slices = cache_slices(cache);
     let source_complete = !cache.codex_scan_incomplete
         && cache.codex_pending_paths.is_empty()
@@ -210,8 +219,8 @@ pub fn codex_quota_windows_from_cache(
             entry_count: totals.entry_count,
             tokens_are_complete,
             cost_is_complete,
-            boundaries_are_estimated: !boundary_is_confirmed(observed_next_resets, start, now)
-                || (offset > 0 && !boundary_is_confirmed(observed_next_resets, end, now))
+            boundaries_are_estimated: !boundary_is_confirmed(&confirmed_resets, start, now)
+                || (offset > 0 && !boundary_is_confirmed(&confirmed_resets, end, now))
                 || reset_at <= now,
         });
     }
@@ -242,6 +251,40 @@ fn current_window_end(
     reset_at + duration * i32::try_from(periods).unwrap_or(i32::MAX)
 }
 
+fn observed_boundaries(
+    observations: &[CodexQuotaResetObservation],
+    duration: Duration,
+    now: DateTime<Utc>,
+) -> (Vec<DateTime<Utc>>, Vec<DateTime<Utc>>) {
+    let tolerance = Duration::seconds(RESET_TOLERANCE_SECONDS);
+    let mut boundaries = Vec::new();
+    let mut confirmed = Vec::new();
+    for observation in observations {
+        let captured = observation.captured_at;
+        let reset = observation.resets_at;
+        if captured <= DateTime::<Utc>::UNIX_EPOCH
+            || reset <= DateTime::<Utc>::UNIX_EPOCH
+            || captured > now
+        {
+            continue;
+        }
+        if reset <= captured {
+            // Expired, superseded forecasts remain forecasts. A historical
+            // reset needs an observation recorded after that boundary.
+            boundaries.push(reset);
+            confirmed.push(reset);
+        } else if let Some(start) = reset.checked_sub_signed(duration)
+            && captured.signed_duration_since(start) >= tolerance
+        {
+            // Idle forecasts roll at captured_at + one week. Their inferred
+            // start is now, so they cannot establish an earlier cycle. An
+            // anchored forecast can preserve an early restart, as an estimate.
+            boundaries.push(start);
+        }
+    }
+    (boundaries, confirmed)
+}
+
 fn quota_boundaries(
     observed_next_resets: &[DateTime<Utc>],
     current_end: DateTime<Utc>,
@@ -252,7 +295,8 @@ fn quota_boundaries(
     let count_i32 = i32::try_from(count).expect("quota window count is capped");
     let earliest = current_end - duration * (count_i32 + 2);
     let latest = current_end + Duration::seconds(RESET_TOLERANCE_SECONDS);
-    let mut dates = vec![current_end, current_end - duration];
+    let current_start = current_end - duration;
+    let mut dates = Vec::new();
     let mut observations: Vec<_> = observed_next_resets
         .iter()
         .copied()
@@ -272,21 +316,22 @@ fn quota_boundaries(
     }
     dates.sort();
     dates = unique_dates(dates);
-    dates.retain(|date| *date >= earliest && *date <= latest);
-    dates.retain(|date| (*date - current_end).abs() > Duration::seconds(RESET_TOLERANCE_SECONDS));
+    // Merge the full jitter chain before clipping, so no short tail remains.
+    dates.retain(|date| {
+        *date >= earliest && *date < current_start - Duration::seconds(RESET_TOLERANCE_SECONDS)
+    });
+    dates.push(current_start);
     dates.push(current_end);
     dates.sort();
 
-    // Fill gaps so sparse observations do not collapse several ordinary weeks
-    // into one historical row.
+    // Fill missing whole weeks backwards from the most recent anchor, while
+    // preserving irregular observed gaps instead of inventing a short tail.
     let mut filled = Vec::with_capacity(dates.len());
-    for date in dates {
+    for date in dates.into_iter().rev() {
         if let Some(mut cursor) = filled.last().copied() {
             loop {
-                let next = cursor + duration;
-                // Insert only a missing whole window. Splitting an observed
-                // gap slightly longer than a week would invent a short tail.
-                if next + duration > date || next <= cursor {
+                let next = cursor - duration;
+                if next - duration < date || next >= cursor {
                     break;
                 }
                 filled.push(next);

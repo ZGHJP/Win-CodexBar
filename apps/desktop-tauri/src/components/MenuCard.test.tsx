@@ -111,9 +111,30 @@ function renderCard(
   );
 }
 
+function quotaFixture() {
+  const end = new Date(Date.now() + 3 * 24 * 60 * 60_000).toISOString();
+  const start = new Date(Date.parse(end) - 7 * 24 * 60 * 60_000).toISOString();
+  const snapshot = {
+    ...provider(null), providerId: "codex", displayName: "Codex",
+    accountEmail: "quota@example.test", planName: "Pro", sourceLabel: "oauth",
+    secondary: rateWindow(5, { windowMinutes: 10_080, resetsAt: end }),
+  };
+  const chart = {
+    providerId: "codex", costHistory: [], tokensHistory: [], creditsHistory: [],
+    usageBreakdown: [], localUsage: null, tokensIncomplete: false,
+    quotaWindowHistory: {
+      providerId: "codex", accountScope: snapshot.accountEmail, historyCoverageEstablished: false,
+      windows: [{ offset: 0, start, end, totalTokens: 1234, totalCostUsd: 1.25,
+        tokensAreComplete: true, costIsComplete: true, entryCount: 1, boundariesAreEstimated: true }],
+    },
+  };
+  return { snapshot, chart };
+}
+
 describe("MenuCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     tauriMocks.claudeAccountsList.mockResolvedValue([]);
     tauriMocks.getLocaleStrings.mockResolvedValue(
       buildBundle({
@@ -907,6 +928,52 @@ describe("MenuCard", () => {
     expect(bar.title).toContain("tokens");
     expect(bar.title).toContain("Unpriced");
     expect(bar.title).not.toContain("$0");
+  });
+
+  it("keeps the displayed quota table while a same-account refresh is pending", async () => {
+    const { snapshot, chart } = quotaFixture();
+    tauriMocks.getProviderChartData.mockResolvedValue(chart);
+    const view = renderCard(snapshot);
+    await screen.findByText("~1,234");
+    tauriMocks.getProviderChartData.mockImplementation(() => new Promise(() => {}));
+    view.rerender(<LocaleProvider><MenuCard provider={{ ...snapshot, updatedAt: "2026-11-06T01:00:00Z" }} display={{ hideEmail: false, resetTimeRelative: true }} /></LocaleProvider>);
+    expect(screen.getByText("~1,234")).toBeInTheDocument();
+  });
+
+  it("restores the quota table on remount before the new request returns", async () => {
+    const { snapshot, chart } = quotaFixture();
+    tauriMocks.getProviderChartData.mockResolvedValue(chart);
+    const first = renderCard(snapshot);
+    await screen.findByText("~1,234");
+    first.unmount();
+    tauriMocks.getProviderChartData.mockImplementation(() => new Promise(() => {}));
+    renderCard(snapshot);
+    await screen.findByText("Codex");
+    expect(screen.getByText("~1,234")).toBeInTheDocument();
+  });
+
+  it("accepts a request that finishes after its old card closes", async () => {
+    const { snapshot, chart } = quotaFixture();
+    let finish!: (value: typeof chart) => void;
+    tauriMocks.getProviderChartData.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const first = renderCard(snapshot);
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    first.unmount();
+    tauriMocks.getProviderChartData.mockImplementation(() => new Promise(() => {}));
+    renderCard(snapshot);
+    await screen.findByText("Codex");
+    await act(async () => { finish(chart); });
+    expect(await screen.findByText("~1,234")).toBeInTheDocument();
+  });
+
+  it("does not show the previous account's quota during an account switch", async () => {
+    const { snapshot, chart } = quotaFixture();
+    tauriMocks.getProviderChartData.mockResolvedValue(chart);
+    const view = renderCard(snapshot);
+    await screen.findByText("~1,234");
+    tauriMocks.getProviderChartData.mockImplementation(() => new Promise(() => {}));
+    view.rerender(<LocaleProvider><MenuCard provider={{ ...snapshot, accountEmail: "another@example.test" }} display={{ hideEmail: false, resetTimeRelative: true }} /></LocaleProvider>);
+    expect(screen.queryByText("~1,234")).not.toBeInTheDocument();
   });
 
   it("refreshes the tray cost chart when the same account publishes new usage after midnight", async () => {

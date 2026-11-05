@@ -56,12 +56,7 @@ impl Default for CodexResetObservationStore {
     }
 }
 
-/// One observed weekly reset: when it was seen, and the boundary it pointed at.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CodexResetObservation {
-    pub captured_at: chrono::DateTime<chrono::Utc>,
-    pub resets_at: chrono::DateTime<chrono::Utc>,
-}
+pub use crate::codex_costs::CodexQuotaResetObservation as CodexResetObservation;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodexResetObservationMergeResult {
