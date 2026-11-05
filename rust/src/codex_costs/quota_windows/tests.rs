@@ -411,9 +411,18 @@ fn sparse_gaps_are_backfilled_from_the_more_recent_boundary() {
     let end = utc("2026-11-05T15:25:42Z");
     let old = end - Duration::days(30);
     let boundaries = quota_boundaries(&[old], end, Duration::days(7), 4, end - Duration::days(1));
-    assert!(boundaries.contains(&(end - Duration::days(28))));
+    assert!(boundaries.contains(&(end - Duration::days(14))));
+    assert!(boundaries.contains(&(end - Duration::days(21))));
+    // Preserve the irregular nine-day interval at the old edge, rather than
+    // manufacturing a two-day tail by inserting end - 28 days.
+    assert!(!boundaries.contains(&(end - Duration::days(28))));
     assert!(!boundaries.contains(&(old + Duration::days(7))));
     assert!(boundaries.contains(&old));
+    assert!(
+        boundaries
+            .windows(2)
+            .all(|pair| pair[1] - pair[0] >= Duration::days(7))
+    );
 }
 
 #[test]
