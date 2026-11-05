@@ -18,7 +18,7 @@ jobs:
       CARGO_INCREMENTAL: '0'
       CARGO_TERM_COLOR: always
       RUSTFLAGS: '-C target-feature=+crt-static'
-      CARGO_TARGET_DIR: ${{ runner.temp }}\codexbar-cargo-target
+      CARGO_TARGET_DIR: ${{ github.workspace }}-cargo-target
       BUILD_NUMBER: personal-0.70.0-jp.1-gh-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          . ./scripts/worktree-env.ps1 -TargetDirectory "$env:RUNNER_TEMP\codexbar-cargo-target"
+          . ./scripts/worktree-env.ps1 -TargetDirectory $env:CARGO_TARGET_DIR
           pnpm --dir apps/desktop-tauri run tauri:build
           if ($LASTEXITCODE) { throw 'Desktop build failed.' }
           cargo build --locked -p codexbar --bin codexbar --release
