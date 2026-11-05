@@ -18,6 +18,7 @@ jobs:
       CARGO_INCREMENTAL: '0'
       CARGO_TERM_COLOR: always
       RUSTFLAGS: '-C target-feature=+crt-static'
+      CARGO_TARGET_DIR: ${{ runner.temp }}\codexbar-cargo-target
       BUILD_NUMBER: personal-0.70.0-jp.1-gh-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +34,8 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -67,7 +70,8 @@ jobs:
           Copy-Item -LiteralPath 'personal/usage-compat/compat.py' -Destination "$package\usage-compat\compat.py"
           python -m pip install --only-binary=:all: --no-compile --target "$package\usage-compat\python-libs" --requirement personal/usage-compat/requirements.txt
           if ($LASTEXITCODE) { throw 'Compatibility packaging failed.' }
-          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /reference:System.Windows.Forms.dll "/out:$package\app\codexbar.exe" personal/usage-compat/Launcher.cs
+          $launcherSource = Join-Path $env:GITHUB_WORKSPACE 'personal\usage-compat\Launcher.cs'
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /reference:System.Windows.Forms.dll "/out:$package\app\codexbar.exe" $launcherSource
           if ($LASTEXITCODE) { throw 'Launcher build failed.' }
           & "$package\app\codexbar-cli.exe" --version
           if ($LASTEXITCODE) { throw 'CLI smoke check failed.' }
@@ -88,10 +92,10 @@ jobs:
             '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative
           } | Set-Content -LiteralPath "$package\SHA256SUMS.txt" -Encoding utf8
       - name: Upload ready-to-install personal build
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: CodexBar-0.70.0-jp.1-windows-x64
           path: personal-package/
           if-no-files-found: error
           retention-days: 30
-
