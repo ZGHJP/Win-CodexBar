@@ -806,3 +806,5 @@ ProviderAccentColorInvalid = 無效的十六進位顏色。請使用 #RRGGBB 格
 ProviderRaycastAutoImportHelp = 自動從 Chrome 匯入已登入的 www.raycast.com 工作階段。
 ProviderRaycastManualCookieHelp = 貼上來自 www.raycast.com/settings 的 Cookie 標頭。
 ProviderRaycastCookiesDisabled = Raycast Cookie 已停用。
+
+PanelCachedApiPricing = 價格目錄：{ "{}" }（快取估算）

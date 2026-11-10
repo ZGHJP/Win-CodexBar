@@ -148,6 +148,9 @@ pub async fn get_provider_chart_data(
         current_history_context(&state, &provider_id).unwrap_or((None, None));
     let account_email = account_email.or(cached_account_email);
     let cancel = register_chart_scan(&provider_id);
+    if provider_id == "codex" {
+        tauri::async_runtime::spawn(codexbar::core::refresh_codex_pricing_catalog_if_stale());
+    }
     tauri::async_runtime::spawn_blocking(move || {
         build_provider_chart_data_with_cancel(
             provider_id,
@@ -346,6 +349,18 @@ fn build_provider_chart_data_with_cancel(
         .and_then(|snapshot| snapshot.quota_window_history.as_ref())
         .map(map_quota_window_history);
 
+    let mut local_usage = local_usage;
+    if provider_id == "codex"
+        && let Some((fetched_at, true)) = codexbar::core::codex_cached_pricing_date()
+        && let Some(summary) = local_usage.as_mut()
+        && let Some(date) = i64::try_from(fetched_at)
+            .ok()
+            .and_then(DateTime::<Utc>::from_timestamp_millis)
+    {
+        let note = locale::get_text(locale::current_language(), LocaleKey::PanelCachedApiPricing)
+            .replace("{}", &date.format("%Y-%m-%d").to_string());
+        summary.estimate_note = format!("{} · {}", summary.estimate_note, note);
+    }
     ProviderChartData {
         provider_id,
         cost_history,
@@ -661,6 +676,9 @@ pub(crate) fn cached_provider_local_usage_summary(
 pub(crate) async fn refresh_provider_local_usage_cache(provider_ids: Vec<String>) {
     if provider_ids.is_empty() {
         return;
+    }
+    if provider_ids.iter().any(|id| id == "codex") {
+        codexbar::core::refresh_codex_pricing_catalog_if_stale().await;
     }
 
     let failure_provider_ids = provider_ids.clone();

@@ -739,3 +739,5 @@ ProviderAccentColorInvalid = 잘못된 16진수 색상입니다. #RRGGBB 형식(
 ProviderRaycastAutoImportHelp = Chrome에서 로그인된 www.raycast.com 세션을 자동으로 가져옵니다.
 ProviderRaycastManualCookieHelp = www.raycast.com/settings의 Cookie 헤더를 붙여넣습니다.
 ProviderRaycastCookiesDisabled = Raycast 쿠키가 비활성화되었습니다.
+
+PanelCachedApiPricing = { "{}" } API 요금 (캐시 추정)

@@ -752,3 +752,5 @@ ProviderAccentColorInvalid = Color hexadecimal no válido. Usa el formato #RRGGB
 ProviderRaycastAutoImportHelp = Importa automáticamente desde Chrome la sesión iniciada en www.raycast.com.
 ProviderRaycastManualCookieHelp = Pega un encabezado Cookie de www.raycast.com/settings.
 ProviderRaycastCookiesDisabled = Las cookies de Raycast están desactivadas.
+
+PanelCachedApiPricing = Precios API del { "{}" } (estimación en caché)

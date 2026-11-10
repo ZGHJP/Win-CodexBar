@@ -988,3 +988,5 @@ ProviderClaudeWorkspaceSpendHelper = Adiciona o gasto da Admin API por workspace
 ProviderRaycastAutoImportHelp = Importa automaticamente a sessão conectada de www.raycast.com do Chrome.
 ProviderRaycastManualCookieHelp = Cole um cabeçalho Cookie de www.raycast.com/settings.
 ProviderRaycastCookiesDisabled = Os cookies do Raycast estão desativados.
+
+PanelCachedApiPricing = Preços da API de { "{}" } (estimativa em cache)

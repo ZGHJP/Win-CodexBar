@@ -991,6 +991,7 @@ locale_keys! {
     PanelThirtyDayCostHistogram,
     PanelTopModelPrefix,
     PanelEstimatedFromLocalLogs,
+    PanelCachedApiPricing,
     PanelEstimatedFromLocalLogsClaude,
     PanelEstimatedFromLocalLogsMuse,
     PanelExpected,

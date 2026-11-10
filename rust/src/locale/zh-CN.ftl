@@ -805,3 +805,5 @@ ProviderAccentColorInvalid = 无效的十六进制颜色。请使用 #RRGGBB 格
 ProviderRaycastAutoImportHelp = 自动从 Chrome 导入已登录的 www.raycast.com 会话。
 ProviderRaycastManualCookieHelp = 粘贴来自 www.raycast.com/settings 的 Cookie 标头。
 ProviderRaycastCookiesDisabled = Raycast Cookie 已禁用。
+
+PanelCachedApiPricing = 价格目录：{ "{}" }（缓存估算）

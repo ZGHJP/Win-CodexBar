@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
     [Parameter(Mandatory=$true)][string]$SourceCommit,
     [string]$PythonExecutable = 'python',
+    [string]$PricingArtifactPath,
     [string]$BuildNumber = $env:BUILD_NUMBER
 )
 $ErrorActionPreference = 'Stop'
@@ -17,6 +18,18 @@ Copy-Item -LiteralPath $DesktopExecutable -Destination "$package\app\codexbar-de
 Copy-Item -LiteralPath $CliExecutable -Destination "$package\app\codexbar-cli.exe"
 Copy-Item -LiteralPath (Join-Path $repoRoot 'rust\icons\icon.ico') -Destination "$package\app\icon.ico"
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'usage-compat\compat.py') -Destination "$package\usage-compat\compat.py"
+New-Item -ItemType Directory -Path "$package\pricing" | Out-Null
+if ($PricingArtifactPath) {
+    $pricing = Get-Content -LiteralPath $PricingArtifactPath -Raw | ConvertFrom-Json
+    if ($pricing.version -ne 1 -or -not $pricing.fetched_at_unix_ms -or -not $pricing.catalog.providers.openai.models) { throw 'Invalid public pricing artifact.' }
+    $pricingSeed = @{ version=1; fetched_at_unix_ms=$pricing.fetched_at_unix_ms; catalog=$pricing.catalog }
+} else {
+    $catalog = Invoke-RestMethod -Uri 'https://models.dev/api.json' -TimeoutSec 30
+    if ($catalog.providers) { $catalog = $catalog.providers }
+    if (-not $catalog.openai.models -or -not $catalog.anthropic.models) { throw 'Invalid public pricing catalog.' }
+    $pricingSeed = @{ version=1; fetched_at_unix_ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); catalog=@{providers=$catalog} }
+}
+$pricingSeed | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath "$package\pricing\models-dev-v1.json" -Encoding utf8
 foreach ($file in @('LICENSE','NOTICE')) { Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination $package }
 foreach ($file in @('Install.ps1','Install.cmd','R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $package
@@ -40,7 +53,8 @@ if ($LASTEXITCODE) { throw 'CLI smoke check failed.' }
 @{
     repository='ZGHJP/Win-CodexBar'; sourceCommit=$SourceCommit; personalVersion=$version;
     buildNumber=$BuildNumber; python=$runtime.version; signing='Unsigned personal build';
-    pricing='API equivalent estimate, not subscription or credits billing'
+    pricing='API equivalent estimate, not subscription or credits billing';
+    pricingSeedFetchedAtMs=$pricingSeed.fetched_at_unix_ms
 } | ConvertTo-Json | Set-Content -LiteralPath "$package\build-manifest.json" -Encoding utf8
 Get-ChildItem -LiteralPath $package -Recurse -File | Sort-Object FullName | ForEach-Object {
     $relative = $_.FullName.Substring($package.Length + 1).Replace('\','/')

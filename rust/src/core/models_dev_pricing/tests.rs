@@ -7,6 +7,38 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, UNIX_EPOCH};
 
 #[test]
+fn codex_estimates_keep_recent_cached_rates_during_an_outage() {
+    let root = tempfile::tempdir().unwrap();
+    let fetched = UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    let catalog = ModelsDevCatalog::decode(r#"{"openai":{"models":{"cached-test":{"id":"cached-test","cost":{"input":2,"output":10}}}}}"#).unwrap();
+    assert!(ModelsDevCache::save(catalog, fetched, Some(root.path())));
+    let later = fetched + Duration::from_secs(6 * 86_400);
+    assert!(
+        super::pricing_snapshot_at(later, Some(root.path()))
+            .lookup("openai", "cached-test")
+            .is_none()
+    );
+    assert!(super::last_known_codex_at("cached-test", later, Some(root.path())).is_some());
+    assert!(super::last_known_codex_at("unknown-test", later, Some(root.path())).is_none());
+    assert!(
+        super::last_known_codex_at(
+            "cached-test",
+            fetched + Duration::from_secs(31 * 86_400),
+            Some(root.path())
+        )
+        .is_none()
+    );
+    assert!(
+        super::last_known_codex_at(
+            "cached-test",
+            fetched - Duration::from_secs(1),
+            Some(root.path())
+        )
+        .is_none()
+    );
+}
+
+#[test]
 fn decodes_top_level_provider_map_and_converts_million_token_rates() {
     let catalog = ModelsDevCatalog::decode(
         r#"{

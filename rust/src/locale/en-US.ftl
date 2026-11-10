@@ -986,3 +986,5 @@ BurndownChartAriaLabel = Recorded remaining quota burndown
 ProviderRaycastAutoImportHelp = Automatically imports the signed-in www.raycast.com session from Chrome.
 ProviderRaycastManualCookieHelp = Paste a Cookie header from www.raycast.com/settings.
 ProviderRaycastCookiesDisabled = Raycast cookies are disabled.
+
+PanelCachedApiPricing = API prices from { "{}" } (cached estimate)

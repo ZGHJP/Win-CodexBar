@@ -818,3 +818,5 @@ ProviderAccentColorInvalid = 無効な 16 進数カラー。#RRGGBB 形式（例
 ProviderRaycastAutoImportHelp = Chrome からサインイン済みの www.raycast.com セッションを自動でインポートします。
 ProviderRaycastManualCookieHelp = www.raycast.com/settings の Cookie ヘッダーを貼り付けます。
 ProviderRaycastCookiesDisabled = Raycast の Cookie は無効です。
+
+PanelCachedApiPricing = { "{}" } の API 料金（キャッシュによる推定）

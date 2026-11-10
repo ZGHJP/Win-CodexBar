@@ -34,6 +34,20 @@ if (Test-Path -LiteralPath (Join-Path $installDir 'codexbar-desktop.exe')) {
 if (Test-Path -LiteralPath (Join-Path $compatDir 'compat.py')) {
     Copy-Item -LiteralPath (Join-Path $compatDir 'compat.py') -Destination $backup
 }
+$pricingDir = Join-Path $env:LOCALAPPDATA 'CodexBar\model-pricing'
+$pricingTarget = Join-Path $pricingDir 'models-dev-v1.json'
+$pricingSeedPath = Join-Path $packageRoot 'pricing\models-dev-v1.json'
+$seed = Get-Content -LiteralPath $pricingSeedPath -Raw | ConvertFrom-Json
+if ($seed.version -ne 1 -or -not $seed.catalog.providers.openai.models) { throw 'Invalid bundled public pricing catalog.' }
+$existingPricing = $null
+if (Test-Path -LiteralPath $pricingTarget) {
+    try { $existingPricing = Get-Content -LiteralPath $pricingTarget -Raw | ConvertFrom-Json } catch { $existingPricing = $null }
+}
+if (-not $existingPricing -or $existingPricing.fetched_at_unix_ms -lt $seed.fetched_at_unix_ms) {
+    New-Item -ItemType Directory -Path $pricingDir -Force | Out-Null
+    if (Test-Path -LiteralPath $pricingTarget) { Copy-Item -LiteralPath $pricingTarget -Destination (Join-Path $backup 'models-dev-v1.json') }
+    Copy-Item -LiteralPath $pricingSeedPath -Destination $pricingTarget -Force
+}
 Get-ChildItem -LiteralPath (Join-Path $packageRoot 'app') -File | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $installDir $_.Name) -Force
 }

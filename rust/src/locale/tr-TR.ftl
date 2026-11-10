@@ -809,3 +809,5 @@ DeepSeekPricingAdvice = Resmî tarife: yoğun saatler UTC 01:00-04:00 ve 06:00-1
 ProviderRaycastAutoImportHelp = Chrome'da açık olan www.raycast.com oturumunu otomatik olarak içe aktarır.
 ProviderRaycastManualCookieHelp = www.raycast.com/settings adresinden bir Cookie başlığı yapıştırın.
 ProviderRaycastCookiesDisabled = Raycast çerezleri devre dışı.
+
+PanelCachedApiPricing = { "{}" } tarihli API fiyatları (önbellek tahmini)

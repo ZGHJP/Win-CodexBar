@@ -328,7 +328,11 @@ impl CostUsagePricing {
         };
         let pricing = match pricing_snapshot {
             Some(snapshot) => snapshot.lookup(provider_id, lookup_model),
-            None => models_dev_pricing::lookup(provider_id, lookup_model),
+            None => models_dev_pricing::lookup(provider_id, lookup_model).or_else(|| {
+                (provider_id == "openai")
+                    .then(|| models_dev_pricing::lookup_last_known_codex(lookup_model))
+                    .flatten()
+            }),
         }?;
         Some(Self::models_dev_cost_usd(
             &pricing,

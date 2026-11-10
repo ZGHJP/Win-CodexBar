@@ -715,6 +715,7 @@ export const ALL_LOCALE_KEYS = [
   "PanelThirtyDayCostHistogram",
   "PanelTopModelPrefix",
   "PanelEstimatedFromLocalLogs",
+  "PanelCachedApiPricing",
   "PanelEstimatedFromLocalLogsClaude",
   "PanelEstimatedFromLocalLogsMuse",
   "PanelExpected",

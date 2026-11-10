@@ -797,3 +797,5 @@ ProviderAccentColorInvalid = Недопустимый HEX-цвет. Исполь
 ProviderRaycastAutoImportHelp = Автоматически импортирует сеанс www.raycast.com, открытый в Chrome.
 ProviderRaycastManualCookieHelp = Вставьте заголовок Cookie со страницы www.raycast.com/settings.
 ProviderRaycastCookiesDisabled = Файлы cookie Raycast отключены.
+
+PanelCachedApiPricing = Цены API от { "{}" } (оценка по кэшу)

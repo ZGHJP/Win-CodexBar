@@ -15,6 +15,7 @@ use super::ModelsDevPricingTarget;
 const MODELS_DEV_URL: &str = "https://models.dev/api.json";
 const CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const REFRESH_ATTEMPT_WINDOW: Duration = Duration::from_secs(15 * 60);
+const CODEX_CACHED_PRICING_LIMIT: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 /// Per-token pricing decoded from the models.dev catalog.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -652,6 +653,42 @@ pub fn lookup(provider_id: &str, model_id: &str) -> Option<DynamicModelPricing> 
         .then_some(load.artifact)
         .flatten()
         .and_then(|artifact| artifact.catalog.lookup(provider_id, model_id))
+}
+
+/// Codex dollar totals are estimates. During a catalog outage retain recently
+/// fetched OpenAI rates; the desktop discloses their date. Fresh-only lookup
+/// and refresh decisions retain their existing semantics for other callers.
+pub(crate) fn lookup_last_known_codex(model_id: &str) -> Option<DynamicModelPricing> {
+    last_known_codex_at(model_id, SystemTime::now(), None)
+}
+
+fn last_known_codex_at(
+    model_id: &str,
+    now: SystemTime,
+    root: Option<&Path>,
+) -> Option<DynamicModelPricing> {
+    let artifact = ModelsDevCache::load(now, root).artifact?;
+    let age = now.duration_since(artifact.fetched_at()).ok()?;
+    (age <= CODEX_CACHED_PRICING_LIMIT)
+        .then_some(artifact)?
+        .catalog
+        .lookup("openai", model_id)
+}
+
+/// The timestamp is public catalog metadata, never account data.
+pub fn codex_cached_pricing_date() -> Option<(u64, bool)> {
+    let now = SystemTime::now();
+    let load = ModelsDevCache::load(now, None);
+    let artifact = load.artifact?;
+    let age = now.duration_since(artifact.fetched_at()).ok()?;
+    (age <= CODEX_CACHED_PRICING_LIMIT).then_some((artifact.fetched_at_unix_ms, load.is_stale))
+}
+
+pub async fn refresh_codex_pricing_catalog_if_stale() {
+    let now = SystemTime::now();
+    if ModelsDevCache::load(now, None).is_stale {
+        let _ = coordinated_refresh(now, None, RefreshReason::StaleCatalog, fetch_catalog).await;
+    }
 }
 
 /// Why a coordinated refresh runs. A stale-catalog refresh re-checks the
