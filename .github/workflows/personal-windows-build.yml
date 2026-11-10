@@ -102,6 +102,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Compatibility dependency install failed.' }
           python -m unittest discover -s personal/usage-compat -p test_compat.py -v
           if ($LASTEXITCODE) { throw 'Compatibility regressions failed.' }
+          python -m unittest discover -s personal -p test_price_catalog.py -v
+          if ($LASTEXITCODE) { throw 'Public pricing package regressions failed.' }
       - name: Test core Rust manifest
         shell: pwsh
         run: |

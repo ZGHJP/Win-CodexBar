@@ -37,11 +37,15 @@ if (Test-Path -LiteralPath (Join-Path $compatDir 'compat.py')) {
 $pricingDir = Join-Path $env:LOCALAPPDATA 'CodexBar\model-pricing'
 $pricingTarget = Join-Path $pricingDir 'models-dev-v1.json'
 $pricingSeedPath = Join-Path $packageRoot 'pricing\models-dev-v1.json'
-$seed = Get-Content -LiteralPath $pricingSeedPath -Raw | ConvertFrom-Json
-if ($seed.version -ne 1 -or -not $seed.catalog.providers.openai.models) { throw 'Invalid bundled public pricing catalog.' }
+$seedMetadata = & $python -B (Join-Path $packageRoot 'price_catalog.py') $pricingSeedPath --inspect
+if ($LASTEXITCODE) { throw 'Invalid bundled public pricing catalog.' }
+$seed = $seedMetadata | ConvertFrom-Json
 $existingPricing = $null
 if (Test-Path -LiteralPath $pricingTarget) {
-    try { $existingPricing = Get-Content -LiteralPath $pricingTarget -Raw | ConvertFrom-Json } catch { $existingPricing = $null }
+    try {
+        $existingMetadata = & $python -B (Join-Path $packageRoot 'price_catalog.py') $pricingTarget --inspect 2>$null
+        if ($LASTEXITCODE -eq 0) { $existingPricing = $existingMetadata | ConvertFrom-Json }
+    } catch { $existingPricing = $null }
 }
 if (-not $existingPricing -or $existingPricing.fetched_at_unix_ms -lt $seed.fetched_at_unix_ms) {
     New-Item -ItemType Directory -Path $pricingDir -Force | Out-Null

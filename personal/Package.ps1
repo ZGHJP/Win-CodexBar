@@ -20,18 +20,14 @@ Copy-Item -LiteralPath (Join-Path $repoRoot 'rust\icons\icon.ico') -Destination 
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'usage-compat\compat.py') -Destination "$package\usage-compat\compat.py"
 New-Item -ItemType Directory -Path "$package\pricing" | Out-Null
 if ($PricingArtifactPath) {
-    $pricing = Get-Content -LiteralPath $PricingArtifactPath -Raw | ConvertFrom-Json
-    if ($pricing.version -ne 1 -or -not $pricing.fetched_at_unix_ms -or -not $pricing.catalog.providers.openai.models) { throw 'Invalid public pricing artifact.' }
-    $pricingSeed = @{ version=1; fetched_at_unix_ms=$pricing.fetched_at_unix_ms; catalog=$pricing.catalog }
+    $pricingMetadata = & $PythonExecutable (Join-Path $PSScriptRoot 'price_catalog.py') "$package\pricing\models-dev-v1.json" --artifact $PricingArtifactPath
 } else {
-    $catalog = Invoke-RestMethod -Uri 'https://models.dev/api.json' -TimeoutSec 30
-    if ($catalog.providers) { $catalog = $catalog.providers }
-    if (-not $catalog.openai.models -or -not $catalog.anthropic.models) { throw 'Invalid public pricing catalog.' }
-    $pricingSeed = @{ version=1; fetched_at_unix_ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); catalog=@{providers=$catalog} }
+    $pricingMetadata = & $PythonExecutable (Join-Path $PSScriptRoot 'price_catalog.py') "$package\pricing\models-dev-v1.json"
 }
-$pricingSeed | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath "$package\pricing\models-dev-v1.json" -Encoding utf8
+if ($LASTEXITCODE) { throw 'Public price catalog packaging failed.' }
+$pricingMetadata = $pricingMetadata | ConvertFrom-Json
 foreach ($file in @('LICENSE','NOTICE')) { Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination $package }
-foreach ($file in @('Install.ps1','Install.cmd','R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md')) {
+foreach ($file in @('Install.ps1','Install.cmd','R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md','price_catalog.py')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $package
 }
 $runtime = Get-Content (Join-Path $PSScriptRoot 'python-runtime.json') -Raw | ConvertFrom-Json
@@ -54,7 +50,7 @@ if ($LASTEXITCODE) { throw 'CLI smoke check failed.' }
     repository='ZGHJP/Win-CodexBar'; sourceCommit=$SourceCommit; personalVersion=$version;
     buildNumber=$BuildNumber; python=$runtime.version; signing='Unsigned personal build';
     pricing='API equivalent estimate, not subscription or credits billing';
-    pricingSeedFetchedAtMs=$pricingSeed.fetched_at_unix_ms
+    pricingSeedFetchedAtMs=$pricingMetadata.fetched_at_unix_ms
 } | ConvertTo-Json | Set-Content -LiteralPath "$package\build-manifest.json" -Encoding utf8
 Get-ChildItem -LiteralPath $package -Recurse -File | Sort-Object FullName | ForEach-Object {
     $relative = $_.FullName.Substring($package.Length + 1).Replace('\','/')
