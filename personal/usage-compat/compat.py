@@ -100,7 +100,8 @@ def project():
     known = {row[0] for row in conn.execute("SELECT path FROM files")}
     if (BASE / "extra-sources.json").exists():
         known.update(json.loads((BASE / "extra-sources.json").read_text()))
-    since = (dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date() - dt.timedelta(days=7)).isoformat()
+    # First installs need the full thirty-day chart, including archived pages.
+    since = (dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date() - dt.timedelta(days=31)).isoformat()
     for root in (NATIVE / "sessions", NATIVE / "archived_sessions"):
         if not root.exists():
             continue

@@ -4,6 +4,7 @@ import contextlib
 import pathlib
 import tempfile
 import itertools
+import datetime as dt
 import sqlite3
 import sys
 from unittest.mock import patch
@@ -16,6 +17,20 @@ def event(stamp, total, last):
     return stamp, 1, json.dumps(body)
 
 class OwnUsageTest(unittest.TestCase):
+    def test_first_install_includes_compressed_history_older_than_one_week(self):
+        import zstandard
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            native, view = base / 'native', base / 'view'
+            (native / 'sessions').mkdir(parents=True)
+            stamp = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=20)).isoformat().replace('+00:00', 'Z')
+            metadata = {'timestamp': stamp, 'type': 'session_meta', 'payload': {'id': 'older-compressed', 'timestamp': stamp}}
+            content = (json.dumps(metadata) + '\n' + event(stamp, 25, 25)[2] + '\n').encode()
+            (native / 'sessions' / ('rollout-' + stamp[:10] + 'T00-00-00-test.jsonl.zst')).write_bytes(zstandard.ZstdCompressor().compress(content))
+            with patch.multiple(compat, BASE=base, NATIVE=native, VIEW=view, SESSIONS=view / 'sessions'):
+                compat.project()
+            self.assertTrue((view / 'sessions/usage-older-compressed.jsonl').exists())
+
     def test_projection_does_not_link_native_discovery_catalog(self):
         with tempfile.TemporaryDirectory() as temp:
             base = pathlib.Path(temp)
