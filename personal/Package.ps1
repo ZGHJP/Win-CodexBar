@@ -27,7 +27,7 @@ if ($PricingArtifactPath) {
 if ($LASTEXITCODE) { throw 'Public price catalog packaging failed.' }
 $pricingMetadata = $pricingMetadata | ConvertFrom-Json
 foreach ($file in @('LICENSE','NOTICE')) { Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination $package }
-foreach ($file in @('Install.ps1','Install.cmd','R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md','price_catalog.py')) {
+foreach ($file in @('Install.ps1','Install.cmd','R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md','price_catalog.py','MODELS-DEV-LICENSE.txt')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $package
 }
 $runtime = Get-Content (Join-Path $PSScriptRoot 'python-runtime.json') -Raw | ConvertFrom-Json

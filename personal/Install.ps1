@@ -55,7 +55,7 @@ if (-not $existingPricing -or $existingPricing.fetched_at_unix_ms -lt $seed.fetc
 Get-ChildItem -LiteralPath (Join-Path $packageRoot 'app') -File | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $installDir $_.Name) -Force
 }
-foreach ($notice in @('LICENSE', 'NOTICE', 'build-manifest.json', 'SHA256SUMS.txt', 'R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md')) {
+foreach ($notice in @('LICENSE', 'NOTICE', 'build-manifest.json', 'SHA256SUMS.txt', 'R6-R7-REIMPLEMENTATION.md','RELEASE-NOTES.md','MODELS-DEV-LICENSE.txt')) {
     Copy-Item -LiteralPath (Join-Path $packageRoot $notice) -Destination (Join-Path $installDir $notice) -Force
 }
 Copy-Item -LiteralPath (Join-Path $packageRoot 'usage-compat\compat.py') -Destination (Join-Path $compatDir 'compat.py') -Force
