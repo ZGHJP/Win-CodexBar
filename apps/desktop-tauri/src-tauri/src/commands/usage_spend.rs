@@ -1072,13 +1072,15 @@ mod cache_key_tests {
 
     #[test]
     fn unchanged_remote_quota_cannot_keep_local_spend_cached_forever() {
-        let mut coordinator = UsageSpendCoordinator::default();
-        coordinator.cache = Some(CachedUsageSpendSummary {
-            loaded_at: Instant::now() - Duration::from_secs(61),
-            key: "unchanged-quota".to_string(),
-            summary: empty_summary(),
-            refresh_owner: None,
-        });
+        let coordinator = UsageSpendCoordinator {
+            cache: Some(CachedUsageSpendSummary {
+                loaded_at: Instant::now() - Duration::from_secs(61),
+                key: "unchanged-quota".to_string(),
+                summary: empty_summary(),
+                refresh_owner: None,
+            }),
+            ..Default::default()
+        };
         assert!(coordinator.reusable("unchanged-quota", false).is_none());
     }
 

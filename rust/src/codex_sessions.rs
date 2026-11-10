@@ -2,7 +2,14 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// An opt-in projection contains request-only usage. Its native counterparts
+/// must not enter either discovery or the same durable accounting cache.
+pub(crate) fn projection_cache_root(home: &Path) -> Option<PathBuf> {
+    (home.is_absolute() && home.join(".codexbar-usage-projection").is_file())
+        .then(|| home.join(".codexbar-cost-cache"))
+}
 
 pub(crate) fn codex_sessions_dir_candidates(
     home_dir: Option<PathBuf>,
@@ -10,6 +17,15 @@ pub(crate) fn codex_sessions_dir_candidates(
     custom_dirs: &[String],
     wsl_roots: &[PathBuf],
 ) -> Vec<PathBuf> {
+    if let Some(home) = codex_home
+        .as_deref()
+        .map(str::trim)
+        .filter(|home| !home.is_empty())
+        .map(PathBuf::from)
+        && projection_cache_root(&home).is_some()
+    {
+        return vec![home.join("sessions")];
+    }
     let mut dirs = Vec::new();
     let mut seen = HashSet::new();
 
@@ -108,6 +124,32 @@ fn push_unique_path(dirs: &mut Vec<PathBuf>, seen: &mut HashSet<String>, path: P
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn projected_requests_have_one_source_root_and_a_separate_cache() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("projection");
+        fs::create_dir_all(&home).unwrap();
+        assert!(projection_cache_root(&home).is_none());
+        fs::write(
+            home.join(".codexbar-usage-projection"),
+            "owned-request-tokens-v1",
+        )
+        .unwrap();
+        assert_eq!(
+            projection_cache_root(&home),
+            Some(home.join(".codexbar-cost-cache"))
+        );
+        assert_eq!(
+            codex_sessions_dir_candidates(
+                Some(temp.path().to_path_buf()),
+                Some(home.to_string_lossy().into_owned()),
+                &[temp.path().join("native").to_string_lossy().into_owned()],
+                &[temp.path().join("wsl")]
+            ),
+            vec![home.join("sessions")]
+        );
+    }
 
     #[test]
     fn normalizes_codex_root_to_sessions_dir() {

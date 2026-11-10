@@ -1005,8 +1005,13 @@ impl JsonlScanner {
     }
 
     fn cache_path(provider: ProviderId, cache_root: Option<&Path>) -> PathBuf {
+        let projection_root = (provider == ProviderId::Codex && cache_root.is_none())
+            .then(|| std::env::var_os("CODEX_HOME"))
+            .flatten()
+            .and_then(|home| crate::codex_sessions::projection_cache_root(Path::new(&home)));
         let root = cache_root
             .map(|p| p.to_path_buf())
+            .or(projection_root)
             .or_else(Self::default_cache_root)
             .unwrap_or_else(|| PathBuf::from("."));
 

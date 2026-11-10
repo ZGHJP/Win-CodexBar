@@ -85,6 +85,7 @@ def atomic_write(path, data):
 
 def project():
     SESSIONS.mkdir(parents=True, exist_ok=True)
+    atomic_write(VIEW / ".codexbar-usage-projection", b"owned-request-tokens-v1\n")
     conn = sqlite3.connect(BASE / "usage.sqlite")
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, size INTEGER, stamp INTEGER, position INTEGER, metadata TEXT);
@@ -198,9 +199,15 @@ def project():
     return result
 
 def share_readonly_sources():
+    # A native catalog points back to raw rollouts. The projected home owns
+    # only normalized request usage; remove our old catalog hard links only.
+    for name in ("state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm", "session_index.jsonl"):
+        source, target = NATIVE / name, VIEW / name
+        if source.exists() and target.exists() and os.path.samefile(source, target):
+            target.unlink()
     # CodexBar's OAuth reader never refreshes/writes auth.json. Hard links keep
     # the existing protected credential and database in place without copies.
-    for name in ("auth.json", "config.toml", "logs_2.sqlite", "logs_2.sqlite-wal", "logs_2.sqlite-shm", "state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm", "session_index.jsonl"):
+    for name in ("auth.json", "config.toml", "logs_2.sqlite", "logs_2.sqlite-wal", "logs_2.sqlite-shm"):
         source, target = NATIVE / name, VIEW / name
         if not source.exists():
             if target.exists():

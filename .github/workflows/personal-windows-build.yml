@@ -9,8 +9,35 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: personal-windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  supersede:
+    if: github.repository == 'ZGHJP/Win-CodexBar'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Cancel superseded personal builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo=ZGHJP/Win-CodexBar
+          old_runs=$(gh api "repos/$repo/actions/workflows/personal-windows-build.yml/runs?branch=personal%2Fstable&per_page=20" --jq ".workflow_runs[] | select(.run_number < $GITHUB_RUN_NUMBER and (.status == \"in_progress\" or .status == \"queued\")) | .id")
+          for run in $old_runs; do
+            [[ "$run" =~ ^[0-9]+$ ]] || exit 1
+            identity=$(gh api "repos/$repo/actions/runs/$run" --jq '.repository.full_name + "|" + .head_branch + "|" + .path')
+            [[ "$identity" == "$repo|personal/stable|.github/workflows/personal-windows-build.yml" ]] || exit 1
+            bash scripts/gh-safe.sh --repo "$repo" --verify-kind repo -- api "repos/$repo/actions/runs/$run/cancel" --method POST
+          done
   build:
+    needs: supersede
     if: github.repository == 'ZGHJP/Win-CodexBar'
     runs-on: windows-latest
     timeout-minutes: 90
@@ -141,6 +168,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          latest=$(gh api repos/ZGHJP/Win-CodexBar/git/ref/heads/personal/stable --jq .object.sha)
+          [[ "$latest" == "$GITHUB_SHA" ]] || { echo 'A newer source revision supersedes this build.'; exit 1; }
           cd release-assets
           sha256sum --check CodexBar-0.70.0-jp.5-windows-x64.zip.sha256
           cd ..

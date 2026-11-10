@@ -16,6 +16,22 @@ def event(stamp, total, last):
     return stamp, 1, json.dumps(body)
 
 class OwnUsageTest(unittest.TestCase):
+    def test_projection_does_not_link_native_discovery_catalog(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            native, view = base / 'native', base / 'view'
+            native.mkdir(); view.mkdir()
+            for name in ('state_5.sqlite', 'state_5.sqlite-wal', 'state_5.sqlite-shm', 'session_index.jsonl', 'logs_2.sqlite'):
+                source = native / name
+                source.write_bytes(b'original-catalog')
+                (view / name).hardlink_to(source)
+            with patch.multiple(compat, NATIVE=native, VIEW=view), patch.object(compat.winreg, 'OpenKey', side_effect=FileNotFoundError):
+                compat.share_readonly_sources()
+            self.assertFalse((view / 'state_5.sqlite').exists())
+            self.assertFalse((view / 'session_index.jsonl').exists())
+            self.assertTrue((view / 'logs_2.sqlite').exists())
+            self.assertEqual((native / 'state_5.sqlite').read_bytes(), b'original-catalog')
+
     def test_projection_preserves_fast_turn_join_without_prompt_text(self):
         with tempfile.TemporaryDirectory() as temp:
             base = pathlib.Path(temp)
