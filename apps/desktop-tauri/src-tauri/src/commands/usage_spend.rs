@@ -15,6 +15,7 @@ use super::ProviderUsageSnapshot;
 use crate::state::AppState;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,6 +89,7 @@ pub struct UsageSpendSummary {
 #[derive(Debug, Clone)]
 struct CachedUsageSpendSummary {
     key: String,
+    loaded_at: Instant,
     summary: UsageSpendSummary,
     refresh_owner: Option<UsageSpendRefreshOwner>,
 }
@@ -150,9 +152,11 @@ impl UsageSpendCoordinator {
 
     /// The cached summary for `key`, unless the caller forces a rebuild.
     fn reusable(&self, key: &str, force_refresh: bool) -> Option<&CachedUsageSpendSummary> {
-        self.cache
-            .as_ref()
-            .filter(|existing| !force_refresh && existing.key == key)
+        self.cache.as_ref().filter(|existing| {
+            !force_refresh
+                && existing.key == key
+                && existing.loaded_at.elapsed() < Duration::from_secs(60)
+        })
     }
 }
 
@@ -337,6 +341,7 @@ fn build_usage_spend_summary_cached(
     }
     let refresh_owner = refreshing.then(|| owner.clone());
     coordinator.cache = Some(CachedUsageSpendSummary {
+        loaded_at: Instant::now(),
         key: key.clone(),
         summary: summary.clone(),
         refresh_owner: refresh_owner.clone(),
@@ -1054,6 +1059,7 @@ mod cache_key_tests {
         let mut coordinator = UsageSpendCoordinator::default();
         assert!(coordinator.reusable("day|30", false).is_none());
         coordinator.cache = Some(CachedUsageSpendSummary {
+            loaded_at: Instant::now(),
             key: "day|30".to_string(),
             summary: empty_summary(),
             refresh_owner: None,
@@ -1062,6 +1068,18 @@ mod cache_key_tests {
         assert!(coordinator.reusable("day|30", false).is_some());
         assert!(coordinator.reusable("day|30", true).is_none());
         assert!(coordinator.reusable("day|7", false).is_none());
+    }
+
+    #[test]
+    fn unchanged_remote_quota_cannot_keep_local_spend_cached_forever() {
+        let mut coordinator = UsageSpendCoordinator::default();
+        coordinator.cache = Some(CachedUsageSpendSummary {
+            loaded_at: Instant::now() - Duration::from_secs(61),
+            key: "unchanged-quota".to_string(),
+            summary: empty_summary(),
+            refresh_owner: None,
+        });
+        assert!(coordinator.reusable("unchanged-quota", false).is_none());
     }
 
     #[test]

@@ -19,6 +19,7 @@ import { getDeepSeekPricingStatus } from "../lib/tauri";
 import type { DeepSeekPricingStatus } from "../types/bridge";
 import { isUsageItemVisible } from "../lib/usageItemVisibility";
 import { useMonthlyLimitBlockNow } from "../hooks/useMonthlyLimitBlockNow";
+import { useLocalChartRefresh } from "../hooks/useLocalChartRefresh";
 import { chartAccountKey, nextChartRequestAt, quotaHistoryScope, QUOTA_HISTORY_EVENT,
   readQuotaHistory, saveQuotaHistory, validQuotaHistory } from "../lib/quotaHistoryCache";
 
@@ -155,6 +156,7 @@ export default function MenuCard({
     costSummaryDisplayStyle,
   } = display;
   const { t, language } = useLocale();
+  const localChartRevision = useLocalChartRefresh(provider.providerId === "codex" && !compactOverview);
   const accountKey = chartAccountKey(provider);
   const quotaScope = quotaHistoryScope(provider);
   const [chartResult, setChartResult] = useState<{
@@ -226,7 +228,7 @@ export default function MenuCard({
       cancelled = true;
     };
   }, [provider.providerId, provider.accountEmail, provider.updatedAt, accountKey,
-      quotaScope?.resetAt, quotaScope?.windowMinutes, onLayoutChange]);
+      quotaScope?.resetAt, quotaScope?.windowMinutes, localChartRevision, onLayoutChange]);
 
   const isWayfinder = provider.providerId === "wayfinder";
   const email = !isWayfinder && provider.accountEmail

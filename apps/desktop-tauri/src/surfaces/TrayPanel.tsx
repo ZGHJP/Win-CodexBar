@@ -20,6 +20,7 @@ import {
   useTrayPanelController,
 } from "../hooks/useTrayPanelController";
 import { useStayAwakeStatus } from "../hooks/useStayAwakeStatus";
+import { useLocalChartRefresh } from "../hooks/useLocalChartRefresh";
 import MenuCard from "../components/MenuCard";
 import MenuSurface, { MenuEmpty } from "../components/MenuSurface";
 import UpdateBanner from "../components/UpdateBanner";
@@ -354,6 +355,7 @@ function OverviewSpendSummary({
   t: (key: LocaleKey) => string;
 }) {
   const { preferredCode, rates, format } = useCurrency();
+  const localRefresh = useLocalChartRefresh(providerIds.includes("codex"));
   const [summary, setSummary] = useState<UsageSpendSummary | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
 
@@ -382,7 +384,7 @@ function OverviewSpendSummary({
       if (timer) clearTimeout(timer);
       unlisten?.();
     };
-  }, [providerIds.join("|"), period]);
+  }, [providerIds.join("|"), period, localRefresh]);
 
   // Overview consumes the same backend spend catalog as Usage & Spend. Do not
   // restrict accounting to whichever cards happen to be rendered in this tray.

@@ -187,3 +187,33 @@ fn english_estimate_note_is_localized() {
         "Estimated from local Claude logs at API rates; token totals may differ from your bill"
     );
 }
+
+#[test]
+fn codex_history_reads_current_scan_not_previous_cache() {
+    let cache = std::cell::Cell::new(0);
+    let (history, _) =
+        super::snapshot_around_local_scan(false, || Some(cache.get()), |_| cache.set(125));
+    assert_eq!(history, Some(125));
+}
+
+#[test]
+fn claude_snapshot_still_feeds_its_local_scan() {
+    let (snapshot, local) =
+        super::snapshot_around_local_scan(true, || Some(125), |value| value.copied());
+    assert_eq!(snapshot, local);
+    assert_eq!(local, Some(125));
+}
+
+#[test]
+fn desktop_retries_a_stalled_scan_without_turning_each_refresh_into_a_forced_scan() {
+    let mut cache = codexbar::core::CostUsageCache::default();
+    cache.codex_scan_incomplete = true;
+    cache.codex_scan_pause_reason = Some(codexbar::core::CodexScanPauseReason::NoProgress);
+    cache.last_scan_unix_ms = 100_000;
+    assert!(!super::codex_recovery_due(&cache, 159_999));
+    assert!(super::codex_recovery_due(&cache, 160_000));
+    cache.codex_scan_pause_reason = None;
+    assert!(!super::codex_recovery_due(&cache, 200_000));
+    cache.codex_scan_incomplete = false;
+    assert!(!super::codex_recovery_due(&cache, 200_000));
+}

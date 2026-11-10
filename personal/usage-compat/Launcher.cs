@@ -13,7 +13,8 @@ class Launcher {
         try {
             string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string script = Path.Combine(local, "CodexBar", "usage-compat", "compat.py");
-            string python = Path.Combine(local, "Programs", "Python", "Python312", "pythonw.exe");
+            string python = Path.Combine(local, "CodexBar", "usage-compat", "python", "pythonw.exe");
+            if (!File.Exists(python)) python = Path.Combine(local, "Programs", "Python", "Python312", "pythonw.exe");
             var info = new ProcessStartInfo(python, "\"" + script + "\" --launch");
             info.UseShellExecute = false;
             info.CreateNoWindow = true;

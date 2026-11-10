@@ -1319,4 +1319,28 @@ describe("MenuCard live forecast layout", () => {
     expect(forecastLabel).toContain("text-overflow: ellipsis");
     expect(forecastLabel).toContain("white-space: nowrap");
   });
+
+it("refreshes local Codex charts when the provider timestamp stays unchanged", async () => {
+  vi.clearAllMocks();
+  localStorage.clear();
+  eventMocks.listen.mockResolvedValue(() => {});
+  tauriMocks.getLocaleStrings.mockResolvedValue(buildBundle({}));
+  tauriMocks.claudeAccountsList.mockResolvedValue([]);
+  const { snapshot, chart } = quotaFixture();
+  tauriMocks.getProviderChartData.mockResolvedValue(chart);
+  vi.useFakeTimers();
+  const view = renderCard(snapshot);
+  try {
+    await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+    expect(view.container.querySelector(".quota-window-history__range")).not.toBeNull();
+    const initialCalls = tauriMocks.getProviderChartData.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(initialCalls + 1);
+    vi.setSystemTime(Date.now() + 90_000);
+    await act(async () => { fireEvent.focus(window); });
+    expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(initialCalls + 2);
+    await act(async () => { fireEvent(document, new Event("visibilitychange")); });
+    expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(initialCalls + 2);
+  } finally { view.unmount(); vi.useRealTimers(); }
+});
 });
