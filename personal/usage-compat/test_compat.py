@@ -122,6 +122,25 @@ class OwnUsageTest(unittest.TestCase):
                 self.assertEqual(json.loads(target.read_text().splitlines()[0])["payload"]["cwd"], "C:/project")
 
 class NativeFreshnessModeTest(unittest.TestCase):
+    def test_public_price_renewal_is_nonblocking_and_rate_limited(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            (base / 'price_catalog.py').touch()
+            child = MagicMock()
+            child.poll.return_value = None
+            with patch.object(compat, 'BASE', base), patch.object(compat.subprocess, 'Popen', return_value=child) as start:
+                refresh = compat.PricingRefresh()
+                refresh.tick(100)
+                refresh.tick(115)
+                start.assert_called_once()
+                child.wait.assert_not_called()
+                child.poll.return_value = 0
+                refresh.tick(200)
+                start.assert_called_once()
+                refresh.tick(1000)
+                self.assertEqual(start.call_count, 2)
+                refresh.close()
+
     def test_native_restart_keeps_projection_alive_for_replacement_process(self):
         kernel = MagicMock()
         kernel.CreateMutexW.return_value = 123

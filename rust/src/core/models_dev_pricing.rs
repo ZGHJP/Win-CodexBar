@@ -237,6 +237,10 @@ struct ModelsDevCost {
     cache_write: Option<f64>,
     #[serde(rename = "context_over_200k")]
     context_over_200k: Option<ModelsDevContextCost>,
+    /// Exact threshold retained when importing the public repository schema.
+    /// Legacy API catalogs encode their 200K boundary in the field name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    context_threshold: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,7 +264,11 @@ impl DynamicModelPricing {
             output_cost_per_token: per_token(output),
             cache_read_input_cost_per_token: cost.cache_read.filter(valid_number).map(per_token),
             cache_write_input_cost_per_token: cost.cache_write.filter(valid_number).map(per_token),
-            threshold_tokens: above.is_some().then_some(200_000),
+            threshold_tokens: above.map(|_| {
+                cost.context_threshold
+                    .filter(|value| *value > 0)
+                    .unwrap_or(200_000)
+            }),
             input_cost_per_token_above_threshold: above
                 .and_then(|cost| cost.input)
                 .filter(valid_number)

@@ -59,6 +59,7 @@ foreach ($notice in @('LICENSE', 'NOTICE', 'build-manifest.json', 'SHA256SUMS.tx
     Copy-Item -LiteralPath (Join-Path $packageRoot $notice) -Destination (Join-Path $installDir $notice) -Force
 }
 Copy-Item -LiteralPath (Join-Path $packageRoot 'usage-compat\compat.py') -Destination (Join-Path $compatDir 'compat.py') -Force
+Copy-Item -LiteralPath (Join-Path $packageRoot 'price_catalog.py') -Destination (Join-Path $compatDir 'price_catalog.py') -Force
 Copy-Item -LiteralPath (Join-Path $packageRoot 'usage-compat\python-libs') -Destination $compatDir -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $packageRoot 'usage-compat\python') -Destination $compatDir -Recurse -Force
 [IO.File]::WriteAllText((Join-Path $compatDir 'native-pr779.enabled'), 'native workspace snapshot refresh is available')

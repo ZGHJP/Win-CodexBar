@@ -252,6 +252,42 @@ def refresh_indexes():
         subprocess.run([str(APP.with_name("codexbar-cli.exe")), "workspaces", "--days", str(days), "--force", "--json"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=30, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
     atomic_write(BASE / "index-status.json", json.dumps({"at": dt.datetime.now(dt.timezone.utc).isoformat(), "historyDays": sorted(windows)}).encode())
 
+class PricingRefresh:
+    """Renew public rates independently of projection; a failed fetch keeps disk data."""
+    def __init__(self):
+        self.child = None
+        self.started = None
+        self.next_attempt = 0
+
+    def tick(self, now):
+        if self.child is not None:
+            if self.child.poll() is None:
+                if now - self.started > 120:
+                    self.child.kill()
+                return
+            self.child = None
+        updater = BASE / 'price_catalog.py'
+        if now < self.next_attempt or not updater.is_file():
+            return
+        self.next_attempt = now + 900
+        target = Path(os.environ['LOCALAPPDATA']) / 'CodexBar/model-pricing/models-dev-v1.json'
+        try:
+            self.child = subprocess.Popen(
+                [sys.executable, '-B', str(updater), str(target), '--refresh'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+            self.started = now
+        except OSError:
+            pass  # Retry later; never interrupt local usage projection.
+
+    def close(self):
+        if self.child is not None:
+            if self.child.poll() is None:
+                self.child.kill()
+            self.child.wait(timeout=5)
+            self.child = None
+
+
 def launch():
     kernel = ctypes.windll.kernel32
     kernel.CreateMutexW.restype = ctypes.c_void_p
@@ -261,6 +297,7 @@ def launch():
     if already_running:
         subprocess.Popen([str(APP)], env=env, creationflags=subprocess.CREATE_NO_WINDOW)
         return
+    pricing = PricingRefresh()
     try:
         project()
         share_readonly_sources()
@@ -270,6 +307,7 @@ def launch():
         last_desktop = time.monotonic()
         while True:
             now = time.monotonic()
+            pricing.tick(now)
             child_alive = child is not None and child.poll() is None
             if not child_alive:
                 # Release Popen's Windows process handle after handoff. Keeping
@@ -292,6 +330,7 @@ def launch():
                 with (BASE / "errors.log").open("a", encoding="utf-8") as log:
                     log.write(type(error).__name__ + ": " + str(error) + "\n")
     finally:
+        pricing.close()
         kernel.CloseHandle(ctypes.c_void_p(mutex))
 
 

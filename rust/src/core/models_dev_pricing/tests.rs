@@ -39,6 +39,18 @@ fn codex_estimates_keep_recent_cached_rates_during_an_outage() {
 }
 
 #[test]
+fn imported_catalog_keeps_its_explicit_context_threshold() {
+    let catalog = ModelsDevCatalog::decode(r#"{"openai":{"models":{"threshold-test":{"id":"threshold-test","cost":{"input":2,"output":10,"context_threshold":272000,"context_over_200k":{"input":4,"output":15}}}}}}"#).unwrap();
+    assert_eq!(
+        catalog
+            .lookup("openai", "threshold-test")
+            .unwrap()
+            .threshold_tokens,
+        Some(272_000)
+    );
+}
+
+#[test]
 fn decodes_top_level_provider_map_and_converts_million_token_rates() {
     let catalog = ModelsDevCatalog::decode(
         r#"{
