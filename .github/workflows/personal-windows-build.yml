@@ -46,7 +46,7 @@ jobs:
       CARGO_TERM_COLOR: always
       RUSTFLAGS: '-C target-feature=+crt-static'
       CARGO_TARGET_DIR: ${{ github.workspace }}-cargo-target
-      BUILD_NUMBER: personal-0.70.0-jp.5-gh-${{ github.run_number }}
+      BUILD_NUMBER: personal-0.70.0-jp.6-gh-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -141,14 +141,14 @@ jobs:
           if ($LASTEXITCODE) { throw 'CLI build failed.' }
           git diff --exit-code -- Cargo.lock apps/desktop-tauri/pnpm-lock.yaml
           if ($LASTEXITCODE) { throw 'Build changed a lockfile.' }
-          ./personal/Package.ps1 -DesktopExecutable "$env:CARGO_TARGET_DIR\release\codexbar-desktop-tauri.exe" -CliExecutable "$env:CARGO_TARGET_DIR\release\codexbar.exe" -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'CodexBar-0.70.0-jp.5-windows-x64') -SourceCommit $env:GITHUB_SHA
+          ./personal/Package.ps1 -DesktopExecutable "$env:CARGO_TARGET_DIR\release\codexbar-desktop-tauri.exe" -CliExecutable "$env:CARGO_TARGET_DIR\release\codexbar.exe" -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'CodexBar-0.70.0-jp.6-windows-x64') -SourceCommit $env:GITHUB_SHA
       - name: Upload ready-to-install personal build
         uses: actions/upload-artifact@v4
         with:
-          name: CodexBar-0.70.0-jp.5-windows-x64
+          name: CodexBar-0.70.0-jp.6-windows-x64
           path: |
-            CodexBar-0.70.0-jp.5-windows-x64.zip
-            CodexBar-0.70.0-jp.5-windows-x64.zip.sha256
+            CodexBar-0.70.0-jp.6-windows-x64.zip
+            CodexBar-0.70.0-jp.6-windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -164,7 +164,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
-          name: CodexBar-0.70.0-jp.5-windows-x64
+          name: CodexBar-0.70.0-jp.6-windows-x64
           path: release-assets
       - name: Publish verified personal binaries
         env:
@@ -173,6 +173,6 @@ jobs:
           latest=$(gh api repos/ZGHJP/Win-CodexBar/git/ref/heads/personal/stable --jq .object.sha)
           [[ "$latest" == "$GITHUB_SHA" ]] || { echo 'A newer source revision supersedes this build.'; exit 1; }
           cd release-assets
-          sha256sum --check CodexBar-0.70.0-jp.5-windows-x64.zip.sha256
+          sha256sum --check CodexBar-0.70.0-jp.6-windows-x64.zip.sha256
           cd ..
-          bash scripts/gh-safe.sh --repo ZGHJP/Win-CodexBar --verify-kind repo -- release create personal-v0.70.0-jp.5 --target "$GITHUB_SHA" --title "CodexBar 0.70.0-jp.5 for Windows x64" --notes-file personal/RELEASE-NOTES.md release-assets/CodexBar-0.70.0-jp.5-windows-x64.zip release-assets/CodexBar-0.70.0-jp.5-windows-x64.zip.sha256
+          bash scripts/gh-safe.sh --repo ZGHJP/Win-CodexBar --verify-kind repo -- release create personal-v0.70.0-jp.6 --target "$GITHUB_SHA" --title "CodexBar 0.70.0-jp.6 for Windows x64" --notes-file personal/RELEASE-NOTES.md release-assets/CodexBar-0.70.0-jp.6-windows-x64.zip release-assets/CodexBar-0.70.0-jp.6-windows-x64.zip.sha256

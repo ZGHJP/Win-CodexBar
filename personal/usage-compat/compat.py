@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 import winreg
+import tempfile
 
 BASE = Path(__file__).resolve().parent
 NATIVE = Path.home() / ".codex"
@@ -199,30 +200,122 @@ def project():
     atomic_write(BASE / "status.json", json.dumps(result, indent=2).encode())
     return result
 
+def copy_windows_dacl(source, target):
+    """Protect an independent empty file before writing credentials into it."""
+    from ctypes import wintypes
+    security = ctypes.WinDLL('advapi32', use_last_error=True)
+    security.GetFileSecurityW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    security.GetFileSecurityW.restype = wintypes.BOOL
+    security.SetFileSecurityW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.c_void_p]
+    security.SetFileSecurityW.restype = wintypes.BOOL
+    needed = wintypes.DWORD()
+    security.GetFileSecurityW(str(source), 4, None, 0, ctypes.byref(needed))
+    if not needed.value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    descriptor = ctypes.create_string_buffer(needed.value)
+    if not security.GetFileSecurityW(str(source), 4, descriptor, needed, ctypes.byref(needed)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    # Copy the source's effective DACL and prevent extra inherited grants.
+    if not security.SetFileSecurityW(str(target), 4 | 0x80000000, descriptor):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+@contextlib.contextmanager
+def private_temporary(source, target):
+    handle, name = tempfile.mkstemp(prefix='.' + target.name + '-', suffix='.tmp', dir=target.parent)
+    os.close(handle)
+    temporary = Path(name)
+    try:
+        copy_windows_dacl(source, temporary)
+        yield temporary
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def sync_independent_file(source, target):
+    if not source.exists():
+        target.unlink(missing_ok=True)
+        return
+    content = source.read_bytes()
+    if target.exists() and target.stat().st_nlink == 1 and target.read_bytes() == content:
+        copy_windows_dacl(source, target)
+        return
+    with private_temporary(source, target) as temporary:
+        temporary.write_bytes(content)
+        os.replace(temporary, target)  # Replace our directory entry, never the source.
+
+
+_trace_snapshot = {}
+
+def known_projection_homes():
+    local = Path.home() / 'AppData/Local'
+    homes = {VIEW, local / 'CodexBar/usage-compat/home'}
+    for package in (local / 'Packages').glob('OpenAI.Codex_*'):
+        homes.add(package / 'LocalCache/Local/CodexBar/usage-compat/home')
+    return homes
+
+
+def migrate_legacy_homes():
+    """Unlink only our directory entries, including Store-app redirected installs."""
+    names = ('auth.json', 'config.toml', 'logs_2.sqlite', 'logs_2.sqlite-wal', 'logs_2.sqlite-shm', 'state_5.sqlite', 'state_5.sqlite-wal', 'state_5.sqlite-shm', 'session_index.jsonl')
+    for home in known_projection_homes():
+        if home.resolve() == NATIVE.resolve():
+            raise ValueError('Refusing to migrate the native Codex home')
+        script = home.parent / 'compat.py'
+        if home != VIEW and script.is_file() and b'CodexBarUsageCompatibility-JP' in script.read_bytes():
+            backup = script.with_name('compat-before-jp6.py.backup')
+            if not backup.exists():
+                atomic_write(backup, script.read_bytes())
+            atomic_write(script, Path(__file__).read_bytes())
+        for name in names:
+            source, target = NATIVE / name, home / name
+            if source.exists() and target.exists() and source.samefile(target):
+                target.unlink()
+
+def sync_trace_snapshot():
+    source, target = NATIVE / 'logs_2.sqlite', VIEW / 'logs_2.sqlite'
+    for name in ('logs_2.sqlite-wal', 'logs_2.sqlite-shm'):
+        (VIEW / name).unlink(missing_ok=True)
+    if target.exists() and target.stat().st_nlink > 1:
+        target.unlink()
+    if not source.exists():
+        target.unlink(missing_ok=True)
+        return
+    identity = (str(source), source.stat().st_ino)
+    now = time.monotonic()
+    if target.exists() and now - _trace_snapshot.get(identity, -float('inf')) < 300:
+        return
+    deadline = now + 5
+    def progress(status, remaining, total):
+        if time.monotonic() > deadline:
+            raise TimeoutError('Trace snapshot exceeded its time budget')
+    try:
+        with private_temporary(source, target) as temporary:
+            with contextlib.closing(sqlite3.connect(source.resolve().as_uri() + '?mode=ro', uri=True, timeout=1)) as reader, contextlib.closing(sqlite3.connect(temporary)) as writer:
+                reader.backup(writer, pages=256, progress=progress, sleep=0.01)
+                writer.execute('PRAGMA journal_mode=DELETE')
+            os.replace(temporary, target)
+        _trace_snapshot.clear()
+        _trace_snapshot[identity] = now
+    except (sqlite3.Error, OSError, TimeoutError):
+        pass  # Preserve a prior independent snapshot; retry on the next tick.
+
+
 def share_readonly_sources():
-    # A native catalog points back to raw rollouts. The projected home owns
-    # only normalized request usage; remove our old catalog hard links only.
+    if VIEW.resolve() == NATIVE.resolve():
+        raise ValueError('Projected home must be separate from the native Codex home')
+    # A native discovery catalog would mix raw and normalized sessions again.
+    # Remove legacy copies as well as legacy links, only in our owned home.
     for name in ("state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm", "session_index.jsonl"):
+        (VIEW / name).unlink(missing_ok=True)
+    for name in ("auth.json", "config.toml"):
         source, target = NATIVE / name, VIEW / name
-        if source.exists() and target.exists() and os.path.samefile(source, target):
-            target.unlink()
-    # CodexBar's OAuth reader never refreshes/writes auth.json. Hard links keep
-    # the existing protected credential and database in place without copies.
-    for name in ("auth.json", "config.toml", "logs_2.sqlite", "logs_2.sqlite-wal", "logs_2.sqlite-shm"):
-        source, target = NATIVE / name, VIEW / name
-        if not source.exists():
-            if target.exists():
-                target.unlink()
-            continue
         try:
-            if target.exists() and os.path.samefile(source, target):
-                continue
-            if target.exists():
-                target.unlink()
-            os.link(source, target)
-        except OSError:
-            if name in ("auth.json", "config.toml"):
-                raise
+            sync_independent_file(source, target)
+        except FileNotFoundError:
+            # Login/logout may replace the source between read and ACL copy.
+            target.unlink(missing_ok=True)
+    sync_trace_snapshot()
     # Keep the existing startup preference routed through its compatibility
     # entry point if the desktop shell rewrites it to its runtime alias.
     try:
@@ -299,6 +392,7 @@ def launch():
         return
     pricing = PricingRefresh()
     try:
+        migrate_legacy_homes()
         project()
         share_readonly_sources()
         refresh_indexes()
@@ -369,8 +463,11 @@ def desktop_is_running():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--launch", action="store_true")
+    parser.add_argument("--migrate-legacy", action="store_true")
     args = parser.parse_args()
-    if args.launch:
+    if args.migrate_legacy:
+        migrate_legacy_homes()
+    elif args.launch:
         launch()
     else:
         print(json.dumps(project()))

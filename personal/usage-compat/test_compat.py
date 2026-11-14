@@ -17,6 +17,92 @@ def event(stamp, total, last):
     return stamp, 1, json.dumps(body)
 
 class OwnUsageTest(unittest.TestCase):
+    def test_migration_removes_store_redirected_links_and_updates_old_helper(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            native, active, legacy = base / 'native', base / 'active/home', base / 'store-cache/home'
+            native.mkdir(); active.mkdir(parents=True); legacy.mkdir(parents=True)
+            old_script = legacy.parent / 'compat.py'
+            old_script.write_bytes(b'# CodexBarUsageCompatibility-JP legacy fixture')
+            for name in ('auth.json', 'state_5.sqlite', 'logs_2.sqlite'):
+                (native / name).write_bytes(b'synthetic original')
+                (legacy / name).hardlink_to(native / name)
+            with patch.multiple(compat, NATIVE=native, VIEW=active), patch.object(compat, 'known_projection_homes', return_value={active, legacy}):
+                compat.migrate_legacy_homes()
+            self.assertEqual((native / 'auth.json').stat().st_nlink, 1)
+            self.assertEqual((native / 'auth.json').read_bytes(), b'synthetic original')
+            self.assertFalse((legacy / 'auth.json').exists())
+            self.assertNotIn(b'os.link(', old_script.read_bytes())
+
+    def test_credentials_never_share_file_identity_and_follow_atomic_login(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            native, view = base / 'native', base / 'view'
+            native.mkdir(); view.mkdir()
+            for name in ('auth.json', 'config.toml'):
+                (native / name).write_bytes(b'synthetic-before-login')
+                (view / name).hardlink_to(native / name)
+            with patch.multiple(compat, NATIVE=native, VIEW=view), patch.object(compat.winreg, 'OpenKey', side_effect=FileNotFoundError):
+                compat.share_readonly_sources()
+                for name in ('auth.json', 'config.toml'):
+                    self.assertEqual((native / name).stat().st_nlink, 1, 'Codex must be able to persist credentials')
+                    self.assertFalse((native / name).samefile(view / name))
+                replacement = native / 'new-auth'
+                replacement.write_bytes(b'synthetic-after-login')
+                replacement.replace(native / 'auth.json')
+                compat.share_readonly_sources()
+                self.assertEqual((view / 'auth.json').read_bytes(), b'synthetic-after-login')
+                self.assertEqual((native / 'auth.json').stat().st_nlink, 1)
+                (native / 'auth.json').unlink()
+                compat.share_readonly_sources()
+                self.assertFalse((view / 'auth.json').exists(), 'logout must remove stale credential copies')
+
+    def test_trace_snapshot_includes_committed_wal_without_sharing_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            native, view = base / 'native', base / 'view'
+            native.mkdir(); view.mkdir()
+            source = native / 'logs_2.sqlite'
+            with contextlib.closing(sqlite3.connect(source)) as conn:
+                conn.execute('PRAGMA journal_mode=WAL')
+                conn.execute('PRAGMA wal_autocheckpoint=0')
+                conn.execute('CREATE TABLE proof(value TEXT)')
+                conn.execute("INSERT INTO proof VALUES ('committed in WAL')")
+                conn.commit()
+                for suffix in ('', '-wal', '-shm'):
+                    (view / ('logs_2.sqlite' + suffix)).hardlink_to(native / ('logs_2.sqlite' + suffix))
+                with patch.multiple(compat, NATIVE=native, VIEW=view), patch.object(compat.winreg, 'OpenKey', side_effect=FileNotFoundError):
+                    compat.share_readonly_sources()
+                self.assertEqual(source.stat().st_nlink, 1)
+                self.assertFalse(source.samefile(view / 'logs_2.sqlite'))
+                self.assertFalse((view / 'logs_2.sqlite-wal').exists())
+                with contextlib.closing(sqlite3.connect(view / 'logs_2.sqlite')) as snapshot:
+                    self.assertEqual(snapshot.execute('SELECT value FROM proof').fetchone()[0], 'committed in WAL')
+                conn.execute("INSERT INTO proof VALUES ('later WAL row')")
+                conn.commit()
+                later = max(compat._trace_snapshot.values()) + 301
+                with patch.multiple(compat, NATIVE=native, VIEW=view), patch.object(compat.time, 'monotonic', return_value=later):
+                    compat.sync_trace_snapshot()
+                with contextlib.closing(sqlite3.connect(view / 'logs_2.sqlite')) as snapshot:
+                    self.assertEqual(snapshot.execute('SELECT count(*) FROM proof').fetchone()[0], 2)
+
+    def test_failed_credential_copy_keeps_original_and_cleans_temporary(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp)
+            source, target = base / 'native-auth', base / 'view-auth'
+            source.write_bytes(b'synthetic-token')
+            target.hardlink_to(source)
+            identity = source.stat().st_ino
+            with patch.object(compat.os, 'replace', side_effect=PermissionError('synthetic open handle')):
+                with self.assertRaises(PermissionError):
+                    compat.sync_independent_file(source, target)
+            self.assertEqual(source.stat().st_ino, identity)
+            self.assertEqual(source.read_bytes(), b'synthetic-token')
+            self.assertTrue(source.samefile(target))
+            self.assertEqual(list(base.glob('*.tmp')), [])
+            compat.sync_independent_file(source, target)
+            self.assertEqual(source.stat().st_nlink, 1)
+
     def test_first_install_includes_compressed_history_older_than_one_week(self):
         import zstandard
         with tempfile.TemporaryDirectory() as temp:
@@ -44,7 +130,7 @@ class OwnUsageTest(unittest.TestCase):
                 compat.share_readonly_sources()
             self.assertFalse((view / 'state_5.sqlite').exists())
             self.assertFalse((view / 'session_index.jsonl').exists())
-            self.assertTrue((view / 'logs_2.sqlite').exists())
+            self.assertEqual((native / 'logs_2.sqlite').stat().st_nlink, 1)
             self.assertEqual((native / 'state_5.sqlite').read_bytes(), b'original-catalog')
 
     def test_projection_preserves_fast_turn_join_without_prompt_text(self):

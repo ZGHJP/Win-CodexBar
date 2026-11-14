@@ -2,7 +2,7 @@ param([string]$PackageDirectory = $PSScriptRoot)
 $ErrorActionPreference = 'Stop'
 $packageRoot = (Resolve-Path -LiteralPath $PackageDirectory).Path.TrimEnd('\')
 $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'build-manifest.json') -Raw | ConvertFrom-Json
-if ($manifest.repository -ne 'ZGHJP/Win-CodexBar' -or $manifest.personalVersion -ne '0.70.0-jp.5') {
+if ($manifest.repository -ne 'ZGHJP/Win-CodexBar' -or $manifest.personalVersion -ne '0.70.0-jp.6') {
     throw 'Unexpected personal package identity.'
 }
 if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw 'Windows x64 is required.' }
@@ -23,7 +23,7 @@ $running = Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^codex
 if ($running) { throw 'Quit CodexBar before installing. Your settings and usage data will be retained.' }
 $companion = Get-CimInstance Win32_Process | Where-Object {
     $_.Name -match '^pythonw?\.exe$' -and $_.CommandLine -and
-    $_.CommandLine.IndexOf((Join-Path $compatDir 'compat.py'), [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $_.CommandLine.IndexOf('\CodexBar\usage-compat\compat.py', [StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 if ($companion) { throw 'The CodexBar companion is still closing. Wait about 45 seconds, then run Install.cmd again.' }
 $backup = Join-Path $env:LOCALAPPDATA ('CodexBar\install-backups\' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -84,5 +84,7 @@ $installation = [ordered]@{
     })
 }
 $installation | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $compatDir 'native-build.json') -Encoding utf8
+& (Join-Path $compatDir 'python\python.exe') -B (Join-Path $compatDir 'compat.py') --migrate-legacy
+if ($LASTEXITCODE) { throw 'Legacy CodexBar link migration failed. Original Codex credentials were not replaced.' }
 Start-Process -FilePath (Join-Path $installDir 'codexbar.exe') -WorkingDirectory $installDir -WindowStyle Hidden
 $installation | ConvertTo-Json -Depth 8
