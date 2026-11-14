@@ -1,5 +1,21 @@
 # 验证记录
 
+## Personal jp.6 完整重新编译发布（2026-11-15）
+
+[完整安装包及 SHA256](https://github.com/ZGHJP/Win-CodexBar/releases/tag/personal-v0.70.0-jp.6)；源码 `153034d1b0ba047f910bfb9730d88f5b72158ba8`；编译号 `personal-0.70.0-jp.6-full-20261115`。
+
+- 桌面和 CLI 均从 jp.6 源码完整重新编译，生产前端由 Tauri CLI 嵌入；Python 3.12.10、zstandard 0.25.0、公开价格目录和安装脚本全部在 ZIP 内。无旧版下载或补丁安装步骤。
+- 本次重新执行并通过：前端 97 文件、662 测试；兼容层 16；价格工具 4；Windows 原生 desktop 616、core 3699（另 1 项既有忽略）、CLI 1。985 译文键、TypeScript/Vite、Rust 格式与 workspace/all-targets clippy 通过。clippy 保留既有 `-A clippy::double_must_use`。
+- 原先闭端口测试会受开发机应用代理影响并返回 HTTP 502。本次只在该测试使用直连客户端，已完成失败/通过对照，未更改产品或用户代理设置。
+- Rust 1.99.1、LLVM 18、cargo-xwin 交叉编译；使用静态 VC 运行库和 Windows 系统 UCRT。修正构建工具额外静态 UCRT 参数与当前 Rust 混合 CRT 选择的冲突，未改变产品代码。SDK 缺失调试 PDB 导致 LNK4099 警告，不是无警告构建。
+- 本仓库 Actions 实际处于禁用状态；用户完成 GitHub CLI 登录后，本次采用本机全量编译、原生 Windows 验证并直接发布，保持原 Actions 设置。不是复用旧编译包或声称云端构建通过。
+- Windows PowerShell 5.1 实际安装完整包成功，安装后的三个 EXE 与包内哈希一致；普通托盘、WebView2 和辅助层正常，原始 auth.json 链接数仍为 1。没有做新的窗口像素自动化验证，本次无界面源码改动。
+- 已从正式 Release 重新下载 ZIP 和校验文件，与发布前一致；包内 64 个文件逐个校验；未包含账户、真实会话、数据库、旧版 ZIP 或 Bootstrap.ps1。
+
+ZIP SHA256：`fc388893b2047ea05d74a3acccbfccc84668bb24859509fd4607bd5f8a334263`。
+桌面 SHA256：`77a589d0742fbbe33b7789db3fd080b4ceea1ac35c82a4a9384d879dccb69401`。
+CLI SHA256：`5fdfffa64aa3dc506a4076619b628886cf90d301c08c3ac26c5de60030364590`。
+
 ## Personal jp.6 凭据兼容层修复（2026-11-14）
 
 修复源码：`dbfbd8d1a730769529dfb8e31f74cefb366a6043`。

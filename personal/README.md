@@ -45,9 +45,9 @@ jp.5 仍会把凭据和日志数据库硬链接到兼容目录，可能导致 Co
 - 安装包附公开目录；主站失败时从 models.dev 官方 GitHub 仓库续取，辅助层每 15 分钟检查、目录满 24 小时才下载，不阻塞日志整理。
 - 安装包自带 Python/压缩依赖及许可证，目标电脑使用自己的 Codex 登录和日志。
 
-下载：[jp.6 Windows x64 凭据修复安装入口](https://github.com/ZGHJP/Win-CodexBar/raw/refs/heads/downloads-jp6/CodexBar-0.70.0-jp.6-windows-x64-setup.zip)。解压完整目录、退出旧程序后运行 `Install.cmd`，联网下载并校验约 38 MB 的已编译程序，再应用新兼容层。[安装器源码及说明](https://github.com/ZGHJP/Win-CodexBar/tree/downloads-jp6)。验证范围见 [VALIDATION.md](VALIDATION.md)。
+下载：[jp.6 Windows x64 完整安装包](https://github.com/ZGHJP/Win-CodexBar/releases/tag/personal-v0.70.0-jp.6)。下载完整 ZIP、解压全部文件、退出旧程序并等待辅助层结束后运行 `Install.cmd`。包内已有重新编译的桌面程序、CLI、Python 运行时、压缩依赖及价格目录；安装时不下载旧版本或额外打补丁。需要系统 WebView2。验证范围见 [VALIDATION.md](VALIDATION.md)。
 
-此次原生/前端源码未变，安装入口沿用已经完整验证的 jp.5 原生二进制，兼容层升级到 jp.6。安装清单分别记录两部分来源，“关于”页的原生编译号仍可能显示 jp.5-gh-15。不要单独安装旧 jp.5 来验证凭据修复。新的完整重编译 Release 尚未生成；上述安装入口已可下载，不依赖本次 Actions 构建。
+2026-11-15 已从源码 `153034d1b0ba047f910bfb9730d88f5b72158ba8` 完整重新编译；当前编译号为 `personal-0.70.0-jp.6-full-20261115`。不再沿用 jp.5 原生二进制。原生文件版本仍是基线 `0.70.0`，个人维护版本和完整编译号由应用及安装清单标识。`downloads-jp6` 分支的旧在线入口仅作历史记录，当前请下载 Releases 完整包。
 
 ## 计费口径与已知限制
 
