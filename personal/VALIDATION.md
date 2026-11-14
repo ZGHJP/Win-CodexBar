@@ -1,5 +1,22 @@
 # 验证记录
 
+## Personal jp.6 凭据兼容层修复（2026-11-14）
+
+修复源码：`dbfbd8d1a730769529dfb8e31f74cefb366a6043`。
+[可直接下载的 Windows x64 安装入口](https://github.com/ZGHJP/Win-CodexBar/raw/refs/heads/downloads-jp6/CodexBar-0.70.0-jp.6-windows-x64-setup.zip)；[安装器源码及说明](https://github.com/ZGHJP/Win-CodexBar/tree/downloads-jp6)。
+
+- 旧 jp.5 仍创建凭据硬链接，本次新增回归先在旧代码上失败，明确复现源文件链接数为 2；不能把之前每日图表修复当作登录凭据问题已解决。
+- 新兼容层 16 项测试通过，公开价格工具 4 项通过。覆盖凭据/配置独立文件身份、认证原子更新、退出登录、失败保留原件与临时文件清理、已提交 WAL 快照及续取、商店版缓存旧链接与脚本迁移。
+- 真实 Windows NTFS：原始凭据和配置内容/文件身份未改、原始链接数为 1、兼容副本独立；有效访问规则与源一致且保护继承；SQLite 快照 quick_check=ok。辅助层继续运行后没有重建原始凭据硬链接。
+- 完整本机修复包已用 Windows PowerShell 5.1 安装，托盘与辅助层正常。GitHub 安装入口上传后已重新下载并校验 SHA256；在线获取固定校验值的 38 MB 原编译包及安装准备流程也在 Windows PowerShell 5.1 上实际通过。
+- Rust/前端及锁文件与已验证 jp.5 编译来源无差异。此次没有重新编译相同原生组件，也未重跑整套原生测试；沿用以下 jp.5 完整 Windows CI 记录。安装清单明确区分兼容层源码和原生二进制源码，原生编译号仍为 jp.5-gh-15。
+- `personal/stable` 源码上传后 Actions 未启动，插件缺少手动 dispatch，命令行无 GitHub 凭据；浏览器因自动安全检查无法确认网址停止操作。独立重编译的 jp.6 Release 尚未生成；实际提供的是已上传、下载校验和安装准备验证的兼容层更新入口，以及本机完整离线修复包。
+- 未替另一台电脑进行真实重新登录；商店版路径迁移由合成目录测试覆盖。没有清空回收站、改写原始凭据或上传任何账户数据。
+
+安装入口 SHA256：`f29aeddc8abc973cd299ebcdaba2f0a6a0230d8afb99fea97d6d56cc9fa6f5ac`。
+本机完整离线包 SHA256：`d6c8414422cc9120c1474bbfeb45a7acee5d957f5f907da2e1c8e2650e2164c1`。
+原生二进制源码：`da129a9214961540aa41a0a40fb1dea35fdba935`。
+
 ## Personal 0.70.0-jp.5（2026-11-10）
 
 发布源码：`da129a9214961540aa41a0a40fb1dea35fdba935`；

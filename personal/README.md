@@ -45,7 +45,9 @@ jp.5 仍会把凭据和日志数据库硬链接到兼容目录，可能导致 Co
 - 安装包附公开目录；主站失败时从 models.dev 官方 GitHub 仓库续取，辅助层每 15 分钟检查、目录满 24 小时才下载，不阻塞日志整理。
 - 安装包自带 Python/压缩依赖及许可证，目标电脑使用自己的 Codex 登录和日志。
 
-下载：[Windows x64 自用安装包](https://github.com/ZGHJP/Win-CodexBar/releases/tag/personal-v0.70.0-jp.6)。解压完整目录、退出旧程序后运行 `Install.cmd`。验证范围见 [VALIDATION.md](VALIDATION.md)。
+下载：[jp.6 Windows x64 凭据修复安装入口](https://github.com/ZGHJP/Win-CodexBar/raw/refs/heads/downloads-jp6/CodexBar-0.70.0-jp.6-windows-x64-setup.zip)。解压完整目录、退出旧程序后运行 `Install.cmd`，联网下载并校验约 38 MB 的已编译程序，再应用新兼容层。[安装器源码及说明](https://github.com/ZGHJP/Win-CodexBar/tree/downloads-jp6)。验证范围见 [VALIDATION.md](VALIDATION.md)。
+
+此次原生/前端源码未变，安装入口沿用已经完整验证的 jp.5 原生二进制，兼容层升级到 jp.6。安装清单分别记录两部分来源，“关于”页的原生编译号仍可能显示 jp.5-gh-15。不要单独安装旧 jp.5 来验证凭据修复。新的完整重编译 Release 尚未生成；上述安装入口已可下载，不依赖本次 Actions 构建。
 
 ## 计费口径与已知限制
 
