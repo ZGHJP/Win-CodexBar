@@ -176,3 +176,11 @@ jobs:
           sha256sum --check CodexBar-0.70.0-jp.6-windows-x64.zip.sha256
           cd ..
           bash scripts/gh-safe.sh --repo ZGHJP/Win-CodexBar --verify-kind repo -- release create personal-v0.70.0-jp.6 --target "$GITHUB_SHA" --title "CodexBar 0.70.0-jp.6 for Windows x64" --notes-file personal/RELEASE-NOTES.md release-assets/CodexBar-0.70.0-jp.6-windows-x64.zip release-assets/CodexBar-0.70.0-jp.6-windows-x64.zip.sha256
+      - name: Point older download to the credential fix
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/ZGHJP/Win-CodexBar/releases/tags/personal-v0.70.0-jp.5 --jq .body > previous-release-notes.md
+          python -c "from pathlib import Path; p=Path('previous-release-notes.md'); old=p.read_text(); p.write_text('请升级到 [jp.6](https://github.com/ZGHJP/Win-CodexBar/releases/tag/personal-v0.70.0-jp.6)：jp.5 仍可能创建凭据硬链接，导致 Codex 登录 persist_failed。\n\n'+old, encoding='utf-8')"
+          bash scripts/gh-safe.sh --repo ZGHJP/Win-CodexBar --verify-kind repo -- release edit personal-v0.70.0-jp.5 --notes-file previous-release-notes.md
