@@ -734,7 +734,11 @@ mod tests {
         drop(listener);
 
         let started = Instant::now();
-        let error = DeepInfraProvider::new()
+        // This fixture must reach the closed loopback port directly, even
+        // when the developer has enabled an application or system proxy.
+        let mut provider = DeepInfraProvider::new();
+        provider.client = Client::builder().no_proxy().build().unwrap();
+        let error = provider
             .fetch_json::<ChecklistResponse>(
                 &format!("http://{address}/payment/checklist"),
                 "sk-test",
