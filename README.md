@@ -1,3 +1,13 @@
+# 请使用 jp.6 完整安装包
+
+2026-11-15 已完整重新编译并发布桌面程序和 CLI。
+
+[下载 jp.6 完整 ZIP](https://github.com/ZGHJP/Win-CodexBar/releases/download/personal-v0.70.0-jp.6/CodexBar-0.70.0-jp.6-windows-x64.zip) · [发布说明与校验值](https://github.com/ZGHJP/Win-CodexBar/releases/tag/personal-v0.70.0-jp.6)
+
+完整包内已有运行时、兼容层、价格目录及安装脚本，无需下载旧版或打补丁。本分支以下在线入口仅作历史留存，不再首选。
+
+---
+
 # CodexBar jp.6 凭据修复安装入口
 
 [下载 Windows x64 安装入口 ZIP](https://github.com/ZGHJP/Win-CodexBar/raw/refs/heads/downloads-jp6/CodexBar-0.70.0-jp.6-windows-x64-setup.zip)
